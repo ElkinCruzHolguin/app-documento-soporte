@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Historial</title>
+<link rel="stylesheet" href="app.css">
+<script src="comun.js"></script>
+</head>
+<body>
+<header>
+  <h1>Documentos soporte · Saphety</h1>
+  <nav><a href="index.html">Cargar y enviar</a><a href="historial.html" class="activo">Historial</a><a href="admin.html">Administración</a></nav>
+  <div id="banner"></div>
+</header>
+<main>
+  <section class="panel">
+    <h2>Envíos reales a Saphety</h2>
+    <p class="ayuda">Cada envío real queda aquí con el JSON enviado y la respuesta de Saphety. Los envíos simulados no se guardan.</p>
+    <div class="fila-botones">
+      <input id="buscar" placeholder="Buscar por número, proveedor o identificación" style="max-width:420px">
+      <button id="btnBuscar">Buscar</button>
+    </div>
+    <div id="msg"></div>
+    <div class="tabla-scroll">
+      <table>
+        <thead><tr><th>Fecha</th><th>Perfil</th><th>Número</th><th>Proveedor</th><th class="num">Valor</th><th>Estado</th><th>CUDS / mensaje</th></tr></thead>
+        <tbody id="filas"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlgDoc">
+  <div class="cabeza"><b id="dlgTitulo"></b><button class="secundario" onclick="dlgDoc.close()">Cerrar</button></div>
+  <div class="cuerpo" id="dlgCuerpo"></div>
+</dialog>
+
+<script>
+const fecha = (iso) => new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+
+async function cargar() {
+  const msg = document.getElementById('msg');
+  try {
+    const lista = await api(`/api/envios?buscar=${encodeURIComponent(document.getElementById('buscar').value.trim())}`);
+    msg.innerHTML = lista.length ? '' : '<div class="aviso warn">No hay envíos.</div>';
+    document.getElementById('filas').innerHTML = lista.map((e) => `<tr class="clic" data-id="${e.id}">
+      <td>${esc(fecha(e.creadoEn))}</td><td>${esc(e.perfilNombre)}</td><td>${esc(e.numero)}</td><td>${esc(e.proveedor)}</td>
+      <td class="num">${pesos(e.valor)}</td><td>${chip(e.estado)}</td>
+      <td>${e.estado === 'aceptado' ? esc(e.cuds || '') : `<ul class="lista-msg err"><li>${esc((e.mensaje || '').split('\n').slice(0, 3).join(' '))}</li></ul>`}</td></tr>`).join('');
+    document.querySelectorAll('#filas tr.clic').forEach((tr) => tr.onclick = () => ver(tr.dataset.id));
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err">${esc(e.message)}</div>`;
+  }
+}
+
+async function ver(id) {
+  const e = await api(`/api/envios/${id}`);
+  const xml = e.respuesta && e.respuesta.ResultData && e.respuesta.ResultData.Content;
+  const respuesta = xml ? { ...e.respuesta, ResultData: { ...e.respuesta.ResultData, Content: '(XML en base64, usa «Descargar XML»)' } } : e.respuesta;
+  document.getElementById('dlgTitulo').textContent = `${e.numero || ''} · ${e.proveedor || ''} · ${fecha(e.creadoEn)}`;
+  document.getElementById('dlgCuerpo').innerHTML = `
+    <p>${chip(e.estado)} ${e.saphetyId ? `<span class="ayuda">Id Saphety ${esc(e.saphetyId)}</span>` : ''}</p>
+    ${e.mensaje ? `<pre>${esc(e.mensaje)}</pre>` : ''}
+    <div class="columnas-2">
+      <div><h3>JSON enviado</h3><pre>${esc(JSON.stringify(e.documento, null, 2))}</pre></div>
+      <div><h3>Respuesta de Saphety</h3><pre>${esc(JSON.stringify(respuesta, null, 2))}</pre>
+        ${xml ? '<div class="fila-botones"><button class="secundario" id="dlgXml">Descargar XML</button></div>' : ''}</div>
+    </div>`;
+  if (xml) {
+    document.getElementById('dlgXml').onclick = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([Uint8Array.from(atob(xml), (c) => c.charCodeAt(0))], { type: 'application/xml' }));
+      a.download = `${e.numero}.xml`;
+      a.click();
+    };
+  }
+  document.getElementById('dlgDoc').showModal();
+}
+
+document.getElementById('btnBuscar').onclick = cargar;
+document.getElementById('buscar').onkeydown = (ev) => { if (ev.key === 'Enter') cargar(); };
+cargar();
+</script>
+</body>
+</html>

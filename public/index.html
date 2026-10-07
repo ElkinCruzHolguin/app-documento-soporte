@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentos soporte</title>
+<link rel="stylesheet" href="app.css">
+<script src="comun.js"></script>
+</head>
+<body>
+<header>
+  <h1>Documentos soporte · Saphety</h1>
+  <nav><a href="index.html" class="activo">Cargar y enviar</a><a href="historial.html">Historial</a><a href="admin.html">Administración</a></nav>
+  <div id="banner"></div>
+</header>
+<main>
+  <section class="panel">
+    <h2>Cargar Excel</h2>
+    <p class="ayuda">Cada fila del Excel es un documento soporte. La app lo convierte al JSON de Saphety y lo valida; nada sale a Saphety hasta que pulses «Enviar». Los envíos reales quedan en el Historial; el Excel y los simulados no se guardan.</p>
+    <div class="fila-botones">
+      <input type="file" id="archivo" accept=".xlsx" style="max-width:420px">
+      <button id="btnCargar">Convertir y validar</button>
+    </div>
+    <div id="msgCarga"></div>
+  </section>
+
+  <section class="panel oculto" id="panelLote">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2 id="tituloLote" style="margin:0"></h2>
+      <div class="fila-botones" style="margin:0">
+        <button class="secundario" id="btnJson" title="Descarga el JSON de las filas sin errores">Descargar JSON</button>
+        <button class="secundario" id="btnCsv">Descargar resultados (CSV)</button>
+        <button id="btnEnviar">Enviar seleccionados</button>
+      </div>
+    </div>
+    <div class="resumen" id="resumenLote" style="margin:10px 0"></div>
+    <div id="msgLote"></div>
+    <div class="fila-botones" style="margin:0 0 8px">
+      <label style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="soloProblemas" style="width:auto"> Ver solo filas con errores o rechazos</label>
+    </div>
+    <div class="tabla-scroll">
+      <table>
+        <thead><tr>
+          <th><input type="checkbox" id="selTodos" style="width:auto" title="Seleccionar todos los enviables"></th>
+          <th>Fila</th><th>Número</th><th>Proveedor</th><th class="num">Valor</th><th>Estado</th><th>Observaciones</th>
+        </tr></thead>
+        <tbody id="filas"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlgDoc">
+  <div class="cabeza"><b id="dlgTitulo"></b><button class="secundario" onclick="dlgDoc.close()">Cerrar</button></div>
+  <div class="cuerpo" id="dlgCuerpo"></div>
+</dialog>
+
+<script>
+const ENVIABLES = ['pendiente', 'rechazado', 'error_envio', 'simulado'];
+let archivoNombre = '';
+let docs = []; // todo vive en esta página; el servidor no guarda nada
+let enviandoAhora = false;
+
+function pintar() {
+  document.getElementById('panelLote').classList.remove('oculto');
+  document.getElementById('tituloLote').textContent = archivoNombre;
+  const cuenta = (e) => docs.filter((d) => d.estado === e).length;
+  const total = docs.reduce((s, d) => s + (d.valor || 0), 0);
+  document.getElementById('resumenLote').innerHTML = `
+    <span>Filas <b>${docs.length}</b></span>
+    <span>Listas <b>${cuenta('pendiente')}</b></span>
+    <span>Con errores <b>${cuenta('con_errores')}</b></span>
+    <span>Aceptadas <b>${cuenta('aceptado')}</b></span>
+    <span>Rechazadas <b>${cuenta('rechazado') + cuenta('error_envio')}</b></span>
+    <span>Simuladas <b>${cuenta('simulado')}</b></span>
+    <span>Valor total <b>${pesos(total)}</b></span>
+    ${enviandoAhora ? `<span><b>Enviando… ${docs.filter((d) => d.enCola).length} en cola</b></span>` : ''}`;
+  document.getElementById('btnEnviar').disabled = enviandoAhora;
+
+  const solo = document.getElementById('soloProblemas').checked;
+  const visibles = docs.map((d, i) => [d, i]).filter(([d]) => !solo || ['con_errores', 'rechazado', 'error_envio'].includes(d.estado));
+  document.getElementById('filas').innerHTML = visibles.map(([d, i]) => {
+    const msgs = [];
+    if (d.errores.length) msgs.push(`<ul class="lista-msg err">${d.errores.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>`);
+    if (d.mensaje && d.estado !== 'simulado') msgs.push(`<ul class="lista-msg ${d.estado === 'aceptado' ? '' : 'err'}"><li>${esc(d.mensaje.split('\n').slice(0, 4).join(' '))}</li></ul>`);
+    if (d.advertencias.length) msgs.push(`<ul class="lista-msg adv">${d.advertencias.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>`);
+    const enviable = ENVIABLES.includes(d.estado) && !enviandoAhora;
+    return `<tr class="clic" data-i="${i}">
+      <td><input type="checkbox" class="sel" value="${i}" ${d.sel ? 'checked' : ''} ${enviable ? '' : 'disabled'} style="width:auto"></td>
+      <td>${d.fila}</td><td>${esc(d.numero)}</td><td>${esc(d.proveedor)}</td><td class="num">${pesos(d.valor)}</td>
+      <td>${d.enCola ? '<span class="chip pendiente">En cola…</span>' : chip(d.estado)}</td><td>${msgs.join('')}</td></tr>`;
+  }).join('');
+  document.querySelectorAll('#filas .sel').forEach((c) => c.onchange = () => { docs[Number(c.value)].sel = c.checked; });
+  document.querySelectorAll('#filas tr.clic').forEach((tr) => tr.onclick = (ev) => {
+    if (ev.target.matches('input')) return;
+    verDocumento(docs[Number(tr.dataset.i)]);
+  });
+}
+
+function descargar(nombre, contenido, tipo) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+  a.download = nombre;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function verDocumento(d) {
+  document.getElementById('dlgTitulo').textContent = `Fila ${d.fila} · ${d.numero || ''} · ${d.proveedor || ''}`;
+  const tieneXml = d.respuesta && d.respuesta.ResultData && d.respuesta.ResultData.Content;
+  let respuesta = d.respuesta;
+  if (tieneXml) respuesta = { ...d.respuesta, ResultData: { ...d.respuesta.ResultData, Content: '(XML en base64, usa «Descargar XML»)' } };
+  document.getElementById('dlgCuerpo').innerHTML = `
+    <p>${chip(d.estado)} ${d.modo ? `<span class="ayuda">modo ${esc(d.modo)}</span>` : ''} ${d.saphetyId ? `<span class="ayuda">Id Saphety ${esc(d.saphetyId)}</span>` : ''}</p>
+    ${d.mensaje ? `<pre>${esc(d.mensaje)}</pre>` : ''}
+    <div class="columnas-2">
+      <div><h3>${d.modo ? 'JSON enviado' : 'JSON que se enviaría'}</h3><pre>${esc(JSON.stringify(d.json, null, 2))}</pre></div>
+      <div><h3>Datos de la fila</h3><pre>${esc(JSON.stringify(d.datos, null, 2))}</pre>
+        ${respuesta ? `<h3>Respuesta de Saphety</h3><pre>${esc(JSON.stringify(respuesta, null, 2))}</pre>` : ''}
+        <div class="fila-botones">
+          <button class="secundario" id="dlgCopiar">Copiar JSON</button>
+          ${tieneXml ? '<button class="secundario" id="dlgXml">Descargar XML</button>' : ''}
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('dlgCopiar').onclick = () => navigator.clipboard.writeText(JSON.stringify(d.json, null, 2));
+  if (tieneXml) {
+    document.getElementById('dlgXml').onclick = () => {
+      const bytes = Uint8Array.from(atob(d.respuesta.ResultData.Content), (c) => c.charCodeAt(0));
+      descargar(`${d.numero}.xml`, bytes, 'application/xml');
+    };
+  }
+  document.getElementById('dlgDoc').showModal();
+}
+
+document.getElementById('btnCargar').onclick = async () => {
+  const f = document.getElementById('archivo').files[0];
+  const msg = document.getElementById('msgCarga');
+  if (!f) { msg.innerHTML = '<div class="aviso err">Selecciona un archivo .xlsx</div>'; return; }
+  if (enviandoAhora) { msg.innerHTML = '<div class="aviso warn">Espera a que termine el envío en curso.</div>'; return; }
+  msg.innerHTML = '<div class="aviso warn">Leyendo y validando…</div>';
+  try {
+    const r = await api('/api/convertir', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: f });
+    archivoNombre = f.name;
+    docs = r.documentos.map((d) => ({ ...d, estado: d.errores.length ? 'con_errores' : 'pendiente', sel: !d.errores.length }));
+    msg.innerHTML = '';
+    document.getElementById('msgLote').innerHTML = '';
+    pintar();
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err">${esc(e.message)}</div>`;
+  }
+};
+
+document.getElementById('btnEnviar').onclick = async () => {
+  const lista = docs.filter((d) => d.sel && ENVIABLES.includes(d.estado));
+  const msg = document.getElementById('msgLote');
+  if (!lista.length) { msg.innerHTML = '<div class="aviso warn">No hay filas seleccionadas.</div>'; return; }
+  const { perfil } = await api('/api/estado');
+  let confirmado = false;
+  if (perfil.modoEnvio === 'real') {
+    confirmado = confirm(`Se enviarán ${lista.length} documentos REALES a ${perfil.url} con el perfil «${perfil.nombre}». ¿Continuar?`);
+    if (!confirmado) return;
+  }
+  msg.innerHTML = '';
+  enviandoAhora = true;
+  lista.forEach((d) => { d.enCola = true; });
+  pintar();
+  for (const [indice, d] of lista.entries()) {
+    try {
+      const r = await api('/api/enviar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ datos: d.datos, confirmado, indice }) });
+      Object.assign(d, { estado: r.estado, modo: r.modo, mensaje: r.mensaje || '', respuesta: r.respuesta || null, saphetyId: r.saphetyId || null, cuds: r.cuds || null, json: r.json || d.json });
+      if (r.numero) d.numero = r.numero;
+      if (r.errores) d.errores = r.errores;
+      d.sel = false;
+      if (r.detener) {
+        msg.innerHTML = `<div class="aviso err">Envío detenido: ${esc(r.mensaje)}</div>`;
+        break;
+      }
+    } catch (e) {
+      Object.assign(d, { estado: 'error_envio', mensaje: e.message });
+    } finally {
+      d.enCola = false;
+      pintar();
+    }
+  }
+  docs.forEach((d) => { d.enCola = false; });
+  enviandoAhora = false;
+  pintar();
+};
+
+document.getElementById('btnJson').onclick = () => {
+  const validos = docs.filter((d) => !d.errores.length).map((d) => d.json);
+  descargar(archivoNombre.replace(/\.xlsx$/i, '') + '.json', JSON.stringify(validos, null, 2), 'application/json');
+};
+
+document.getElementById('btnCsv').onclick = () => {
+  const campo = (v) => `"${String(v ?? '').replace(/"/g, '""').replace(/\s*\n\s*/g, ' ')}"`;
+  const filas = [['Fila', 'Numero', 'Proveedor', 'Identificacion', 'Valor', 'Estado', 'Modo', 'Id Saphety', 'CUDS', 'Errores', 'Mensaje']];
+  for (const d of docs) {
+    filas.push([d.fila, d.numero, d.proveedor, d.identificacion, d.valor, ETIQUETAS_ESTADO[d.estado] || d.estado, d.modo, d.saphetyId, d.cuds, d.errores.join(' | '), d.mensaje]);
+  }
+  descargar(archivoNombre.replace(/\.xlsx$/i, '') + '-resultados.csv', '﻿' + filas.map((f) => f.map(campo).join(';')).join('\r\n'), 'text/csv');
+};
+
+document.getElementById('selTodos').onchange = (ev) => {
+  docs.forEach((d) => { if (ENVIABLES.includes(d.estado)) d.sel = ev.target.checked; });
+  pintar();
+};
+document.getElementById('soloProblemas').onchange = pintar;
+window.addEventListener('beforeunload', (ev) => {
+  if (enviandoAhora || docs.some((d) => d.modo)) { ev.preventDefault(); ev.returnValue = ''; }
+});
+</script>
+</body>
+</html>

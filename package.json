@@ -1,0 +1,21 @@
+{
+  "name": "app-documento-soporte",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Carga masiva de documentos soporte desde Excel hacia la API de Saphety",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --env-file-if-exists=.env src/server.js",
+    "migrar": "node --env-file=.env scripts/migrar-a-supabase.js",
+    "test": "node --test test/mapper.test.js test/flujo.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "exceljs": "^4.4.0",
+    "express": "^5.1.0"
+  }
+}

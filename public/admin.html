@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administración</title>
+<link rel="stylesheet" href="app.css">
+<script src="comun.js"></script>
+</head>
+<body>
+<header>
+  <h1>Documentos soporte · Saphety</h1>
+  <nav><a href="index.html">Cargar y enviar</a><a href="historial.html">Historial</a><a href="admin.html" class="activo">Administración</a></nav>
+  <div id="banner"></div>
+</header>
+<main>
+  <section class="panel">
+    <div class="fila-botones" style="margin:0">
+      <div style="min-width:260px"><label for="selPerfil">Perfil (ambiente)</label><select id="selPerfil"></select></div>
+      <button class="secundario" id="btnNuevo" style="align-self:end">Nuevo perfil</button>
+      <button class="secundario" id="btnActivar" style="align-self:end">Usar este perfil</button>
+      <button class="peligro" id="btnEliminar" style="align-self:end">Eliminar</button>
+    </div>
+    <p class="ayuda">Un perfil agrupa usuario, contraseña y parámetros de un ambiente o empresa (por ejemplo «Vitro QA» o «Atica QA»). Las cargas usan el perfil activo.</p>
+  </section>
+
+  <div id="msg"></div>
+
+  <form id="form">
+    <section class="panel">
+      <h2>Conexión con Saphety</h2>
+      <div class="rejilla">
+        <div><label>Nombre del perfil</label><input name="nombre" required></div>
+        <div><label>URL de la API</label><input name="url" placeholder="https://api-factura-electronica-co-qa.saphety.com"></div>
+        <div><label>Usuario (correo)</label><input name="usuario" type="email" autocomplete="off"></div>
+        <div><label>Contraseña</label><input name="clave" type="password" autocomplete="new-password"><div class="ayuda" id="ayudaClave"></div></div>
+        <div><label>Operador virtual (opv)</label><input name="opv"></div>
+        <div><label>Company Id</label><input name="companyId"></div>
+      </div>
+      <div class="fila-botones">
+        <button type="button" class="secundario" id="btnProbar">Probar conexión (pedir token)</button>
+        <span class="ayuda">Guarda antes de probar. Solo pide el token, no envía documentos.</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Adquiriente y serie</h2>
+      <div class="rejilla">
+        <div><label>NIT del adquiriente</label><input name="nit"></div>
+        <div><label>Dígito de verificación</label><input name="digitoVerificacion"><div class="ayuda">Se valida contra el NIT.</div></div>
+        <div><label>SerieExternalKey DS</label><input name="serieExternalKeyDS"></div>
+        <div><label>Numeración</label>
+          <select name="numeracion">
+            <option value="excel">Prefijo y folio del Excel</option>
+            <option value="consecutivo">Consecutivo de pruebas (abajo)</option>
+          </select>
+          <div class="ayuda">En calidad la serie habilitada suele ser otra (p. ej. SEDS 984000000–985000000).</div>
+        </div>
+        <div><label>Prefijo de pruebas</label><input name="prefijoConsecutivo"></div>
+        <div><label>Siguiente número de pruebas</label><input name="siguienteConsecutivo" type="number"><div class="ayuda">Sube solo con envíos reales.</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Envío</h2>
+      <div class="rejilla">
+        <div><label>Modo de envío</label>
+          <select name="modoEnvio">
+            <option value="simulado">Simulado (no envía nada)</option>
+            <option value="real">Real (envía a Saphety)</option>
+          </select>
+        </div>
+        <div><label>Método</label>
+          <select name="endpoint">
+            <option value="sync">Síncrono (supportDocument)</option>
+            <option value="async">Asíncrono (supportDocumentAsync)</option>
+          </select>
+        </div>
+        <div><label>Fecha de emisión</label>
+          <select name="fechaEmision">
+            <option value="excel">FECHA_DOC del Excel</option>
+            <option value="hoy">Fecha actual</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Valores por defecto</h2>
+      <div class="rejilla">
+        <div><label>Correo del proveedor por defecto</label><input name="emailProveedorDefecto" type="email"><div class="ayuda">El Excel no trae correo del proveedor.</div></div>
+        <div><label>Medio de pago (PaymentMeans.Code)</label><input name="medioPagoCodigo"></div>
+        <div><label>Forma de pago (PaymentMeans.Mean)</label><input name="medioPagoForma"><div class="ayuda">1 contado, 2 crédito.</div></div>
+        <div><label>Unidad de medida</label><input name="unidadMedida"></div>
+        <div><label>Ciudad por defecto (no residentes)</label><input name="ciudadExtranjeroDefecto"></div>
+        <div><label>Departamento/estado por defecto (no residentes)</label><input name="departamentoExtranjeroDefecto"></div>
+        <div><label>Informar IVA 0 %</label><select name="incluirIvaCero"><option value="true">Sí</option><option value="false">No</option></select></div>
+        <div><label>Enviar teléfono del proveedor</label><select name="incluirTelefono"><option value="true">Sí</option><option value="false">No</option></select></div>
+      </div>
+      <h3>Ubicación de proveedores extranjeros</h3>
+      <p class="ayuda">Para no residentes Saphety pide el nombre de la ciudad y del departamento/estado. Clave: identificación del proveedor (CEDULA O NIT) o código de país (por ejemplo "MX") como respaldo para proveedores nuevos.</p>
+      <textarea name="ubicacionesExtranjeros" rows="12"></textarea>
+      <h3>Tipo de documento DIAN → DocumentType de Saphety</h3>
+      <textarea name="tiposDocumento" rows="8"></textarea>
+      <div class="fila-botones">
+        <button type="button" class="secundario" id="btnCatalogo">Consultar tipos en Saphety</button>
+        <span class="ayuda">Usa el catálogo identificationdocumenttypes de la API (requiere conexión).</span>
+      </div>
+      <pre id="catalogo" class="oculto"></pre>
+    </section>
+
+    <div class="fila-botones"><button type="submit">Guardar</button></div>
+  </form>
+</main>
+<script>
+let perfiles = [];
+let actual = null;
+const form = document.getElementById('form');
+const msg = (html, tipo = 'ok') => {
+  document.getElementById('msg').innerHTML = html ? `<div class="aviso ${tipo}">${html}</div>` : '';
+  if (html) window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+async function cargar(idSeleccion) {
+  perfiles = await api('/api/perfiles');
+  const sel = document.getElementById('selPerfil');
+  sel.innerHTML = perfiles.map((p) => `<option value="${p.id}">${esc(p.nombre)}${p.activo ? ' (activo)' : ''}</option>`).join('');
+  const elegido = perfiles.find((p) => p.id === idSeleccion) || perfiles.find((p) => p.activo) || perfiles[0];
+  if (elegido) { sel.value = elegido.id; mostrar(elegido); }
+  pintarBanner();
+}
+
+function mostrar(p) {
+  actual = p;
+  form.nombre.value = p.nombre;
+  for (const [k, v] of Object.entries(p.config)) {
+    if (!form.elements[k]) continue;
+    form.elements[k].value = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
+  }
+  form.clave.value = '';
+  form.clave.placeholder = p.tieneClave ? '•••••••• (guardada)' : '';
+  document.getElementById('ayudaClave').textContent = p.tieneClave ? 'Déjala vacía para conservar la actual.' : 'Aún no hay contraseña guardada.';
+  document.getElementById('btnActivar').disabled = p.activo;
+  document.getElementById('btnEliminar').disabled = p.activo;
+}
+
+function leerFormulario() {
+  const config = {};
+  for (const el of form.elements) {
+    if (!el.name || ['nombre', 'clave'].includes(el.name)) continue;
+    config[el.name] = el.value;
+  }
+  return { nombre: form.nombre.value, clave: form.clave.value || undefined, config };
+}
+
+form.onsubmit = async (ev) => {
+  ev.preventDefault();
+  try {
+    const p = await api(`/api/perfiles/${actual.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(leerFormulario()) });
+    msg('Configuración guardada.');
+    await cargar(p.id);
+  } catch (e) { msg(esc(e.message), 'err'); }
+};
+
+document.getElementById('selPerfil').onchange = (ev) => { msg(''); mostrar(perfiles.find((p) => p.id === Number(ev.target.value))); };
+
+document.getElementById('btnNuevo').onclick = async () => {
+  const nombre = prompt('Nombre del nuevo perfil (por ejemplo «Vitro QA»):');
+  if (!nombre) return;
+  try {
+    const p = await api('/api/perfiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre, config: {} }) });
+    msg('Perfil creado. Completa los datos y guarda.');
+    await cargar(p.id);
+  } catch (e) { msg(esc(e.message), 'err'); }
+};
+
+document.getElementById('btnActivar').onclick = async () => {
+  await api(`/api/perfiles/${actual.id}/activar`, { method: 'POST' });
+  msg(`Ahora se usa el perfil «${esc(actual.nombre)}».`);
+  await cargar(actual.id);
+};
+
+document.getElementById('btnEliminar').onclick = async () => {
+  if (!confirm(`¿Eliminar el perfil «${actual.nombre}»?`)) return;
+  try {
+    await api(`/api/perfiles/${actual.id}`, { method: 'DELETE' });
+    msg('Perfil eliminado.');
+    await cargar();
+  } catch (e) { msg(esc(e.message), 'err'); }
+};
+
+document.getElementById('btnProbar').onclick = async () => {
+  msg('Pidiendo token…', 'warn');
+  try {
+    const r = await api(`/api/perfiles/${actual.id}/probar`, { method: 'POST' });
+    msg(esc(r.mensaje));
+  } catch (e) { msg(esc(e.message), 'err'); }
+};
+
+document.getElementById('btnCatalogo').onclick = async () => {
+  const pre = document.getElementById('catalogo');
+  pre.classList.remove('oculto');
+  pre.textContent = 'Consultando…';
+  try {
+    pre.textContent = JSON.stringify(await api(`/api/perfiles/${actual.id}/catalogo/identificationdocumenttypes`), null, 2);
+  } catch (e) { pre.textContent = e.message; }
+};
+
+cargar();
+</script>
+</body>
+</html>
