@@ -1,0 +1,6 @@
+data/
+.env
+.env.*
+*.xlsx
+test/
+scripts/
