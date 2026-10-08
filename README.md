@@ -17,13 +17,20 @@ Las variables están documentadas en `.env.example`. Copia ese archivo como `.en
 ## Desplegar (GitHub + Supabase + Vercel)
 1. **Supabase**: en el SQL Editor ejecuta `supabase/esquema.sql`. Crea las tablas `perfiles` y `envios` con RLS activo y sin políticas: solo el servidor, con la service_role key, puede leerlas.
 2. **Vercel**: importa el repositorio de GitHub (Framework: Other) y en *Settings → Environment Variables* define:
-   - `APP_USUARIO`, `APP_CLAVE`: acceso a la app. Sin ellas, la app en Vercel no atiende.
+   - `APP_USUARIO`, `APP_CLAVE`: super administrador de la app. Sin ellas, la app en Vercel no atiende.
    - `APP_SECRETO`: llave larga y aleatoria para cifrar la contraseña de Saphety. No la cambies después.
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`: en Supabase, *Project Settings → API*.
 3. Cada push a `main` despliega de nuevo. Las páginas (`public/`) las sirve Vercel y la API corre en `api/index.js` (ver `vercel.json`). Vercel limita las peticiones a 4,5 MB, así que el Excel debe pesar menos.
 4. Para pasar los perfiles que ya tenías en `data/` a Supabase, pon las variables de Supabase y `APP_SECRETO` en `.env` y ejecuta `npm run migrar`.
 
 La contraseña de Saphety se escribe en Administración, se guarda cifrada (AES-256-GCM) con `APP_SECRETO` y nunca vuelve al navegador.
+
+## Usuarios y acceso
+- Se entra por `login.html` con usuario y contraseña; la sesión (cookie firmada, HttpOnly) dura 12 horas.
+- **Super administrador**: `APP_USUARIO`/`APP_CLAVE`. Ve todo y es el único (junto con los usuarios de rol administrador) que entra a Administración.
+- **Usuarios de compañía**: se crean en Administración › Usuarios, cada uno ligado a un perfil. Solo cargan y envían con su perfil, solo ven su historial y no pueden cambiar parámetros. El servidor lo exige en cada petición; desactivar un usuario o cambiarle el perfil cierra su sesión al instante.
+- Las contraseñas se guardan con scrypt y no se pueden recuperar: si se olvida, el administrador asigna una nueva. 5 intentos fallidos bloquean ese usuario 15 minutos.
+- En local, sin `APP_USUARIO`/`APP_CLAVE`, no se pide inicio de sesión.
 
 ## Uso
 1. **Administración**: crea o edita el perfil (ambiente). Ahí se parametrizan usuario (correo), contraseña, URL, opv, companyId, NIT y DV del adquiriente, SerieExternalKey de DS, numeración, modo de envío y valores por defecto. La contraseña se guarda cifrada y nunca se muestra; si dejas el campo vacío se conserva la actual. «Probar conexión» solo pide el token.
