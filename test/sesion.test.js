@@ -63,6 +63,7 @@ test('login, roles y aislamiento entre compañías', async () => {
     assert.strictEqual((await crearUsuario({ usuario: 'vitro', clave: 'corta', perfilId: vitro.id })).status, 400);
     assert.strictEqual((await crearUsuario({ usuario: 'jefe', clave: 'clave-larga-123', perfilId: vitro.id })).status, 400);
     assert.strictEqual((await crearUsuario({ usuario: 'sinperfil', clave: 'clave-larga-123' })).status, 400);
+    assert.strictEqual((await crearUsuario({ usuario: 'otroadmin', clave: 'clave-larga-123', rol: 'admin' })).status, 400);
     const uVitro = (await crearUsuario({ usuario: 'Vitro', clave: 'clave-vitro-123', perfilId: vitro.id })).datos;
     assert.strictEqual(uVitro.usuario, 'vitro');
     assert.ok(!JSON.stringify(uVitro).includes('scrypt'));
@@ -82,7 +83,11 @@ test('login, roles y aislamiento entre compañías', async () => {
     const est = (await llamar('/api/estado', { cookie: cVitro })).datos;
     assert.strictEqual(est.usuario.rol, 'empresa');
     assert.strictEqual(est.perfil.nombre, 'Vitro QA');
-    assert.strictEqual((await llamar('/api/perfiles', { cookie: cVitro })).status, 403);
+    // Puede ver (solo lectura) la configuración de su compañía, nunca la de otra ni modificarla
+    assert.deepStrictEqual((await llamar('/api/perfiles', { cookie: cVitro })).datos.map((p) => p.nombre), ['Vitro QA']);
+    assert.strictEqual((await llamar(`/api/perfiles/${atica.id}/catalogo/x`, { cookie: cVitro })).status, 403);
+    assert.strictEqual((await llamar(`/api/perfiles/${vitro.id}`, { cookie: cVitro, metodo: 'PUT', cuerpo: { config: { modoEnvio: 'real' } } })).status, 403);
+    assert.strictEqual((await llamar('/api/perfiles', { cookie: cVitro, metodo: 'POST', cuerpo: { nombre: 'Otra' } })).status, 403);
     assert.strictEqual((await llamar(`/api/perfiles/${atica.id}`, { cookie: cVitro, metodo: 'PUT', cuerpo: { config: { modoEnvio: 'real' } } })).status, 403);
     assert.strictEqual((await llamar('/api/usuarios', { cookie: cVitro })).status, 403);
     assert.deepStrictEqual((await llamar('/api/envios', { cookie: cVitro })).datos.map((e) => e.numero), ['V1']);

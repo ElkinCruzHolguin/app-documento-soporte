@@ -27,8 +27,9 @@ La contraseña de Saphety se escribe en Administración, se guarda cifrada (AES-
 
 ## Usuarios y acceso
 - Se entra por `login.html` con usuario y contraseña; la sesión (cookie firmada, HttpOnly) dura 12 horas.
-- **Super administrador**: `APP_USUARIO`/`APP_CLAVE`. Ve todo y es el único (junto con los usuarios de rol administrador) que entra a Administración.
-- **Usuarios de compañía**: se crean en Administración › Usuarios, cada uno ligado a un perfil. Solo cargan y envían con su perfil, solo ven su historial y no pueden cambiar parámetros. El servidor lo exige en cada petición; desactivar un usuario o cambiarle el perfil cierra su sesión al instante.
+- **Super administrador**: `APP_USUARIO`/`APP_CLAVE`. Ve todo y es el único que crea o modifica compañías y usuarios.
+- **Compañías**: solo el super administrador las crea y modifica (Administración › «Nueva compañía»). Cada una tiene su conexión con Saphety, sus parámetros, sus usuarios y su historial.
+- **Usuarios de compañía**: se crean en Administración › Usuarios, cada uno ligado a una compañía. Solo cargan y envían con su compañía, solo ven su historial y ven la configuración de su compañía en solo lectura («Mi compañía»). El servidor lo exige en cada petición; desactivar un usuario o cambiarle el perfil cierra su sesión al instante.
 - Las contraseñas se guardan con scrypt y no se pueden recuperar: si se olvida, el administrador asigna una nueva. 5 intentos fallidos bloquean ese usuario 15 minutos.
 - En local, sin `APP_USUARIO`/`APP_CLAVE`, no se pide inicio de sesión.
 

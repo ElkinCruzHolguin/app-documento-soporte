@@ -7,10 +7,10 @@
 <link rel="stylesheet" href="app.css">
 <script src="comun.js"></script>
 </head>
-<body data-solo-admin>
+<body>
 <header>
   <h1>Documentos soporte · Saphety</h1>
-  <nav><a href="index.html">Cargar y enviar</a><a href="historial.html">Historial</a><a href="admin.html" class="activo" data-solo-admin>Administración</a></nav>
+  <nav><a href="index.html">Cargar y enviar</a><a href="historial.html">Historial</a><a href="admin.html" class="activo" data-enlace-admin>Administración</a></nav>
   <div id="banner"></div>
 </header>
 <main>
@@ -105,12 +105,12 @@
       <pre id="catalogo" class="oculto"></pre>
     </section>
 
-    <div class="fila-botones"><button type="submit">Guardar</button></div>
+    <div class="fila-botones"><button type="submit" id="btnGuardar">Guardar</button></div>
   </form>
 
   <section class="panel" id="panelUsuarios">
     <h2>Usuarios</h2>
-    <p class="ayuda">Un usuario de compañía solo trabaja con su compañía: carga y envía con ella y solo ve su historial. No puede entrar a Administración ni cambiar parámetros. Un usuario administrador ve todo, igual que tú.</p>
+    <p class="ayuda">Un usuario de compañía solo trabaja con su compañía: carga y envía con ella y solo ve su historial. Puede ver la configuración de su compañía en esta pantalla, pero solo tú (administrador) puedes modificarla.</p>
     <div id="msgUsuarios"></div>
     <div class="tabla-scroll">
       <table>
@@ -123,7 +123,6 @@
       <div><label for="nuUsuario">Usuario</label><input id="nuUsuario" autocomplete="off" placeholder="p. ej. vitro"></div>
       <div><label for="nuClave">Contraseña (mínimo 10 caracteres)</label><input id="nuClave" autocomplete="new-password">
         <div class="ayuda"><a href="#" id="btnGenerar">Generar una segura</a> · cópiala y entrégala a la compañía: después no se puede ver.</div></div>
-      <div><label for="nuRol">Rol</label><select id="nuRol"><option value="empresa">Compañía</option><option value="admin">Administrador</option></select></div>
       <div id="cajaPerfil"><label for="nuPerfil">Compañía</label><select id="nuPerfil"></select></div>
     </div>
     <div class="fila-botones"><button type="button" id="btnCrearUsuario">Crear usuario</button></div>
@@ -268,11 +267,10 @@ async function cargarUsuarios() {
 }
 
 document.getElementById('btnGenerar').onclick = (ev) => { ev.preventDefault(); document.getElementById('nuClave').value = claveAleatoria(); };
-document.getElementById('nuRol').onchange = (ev) => { document.getElementById('cajaPerfil').hidden = ev.target.value === 'admin'; };
 document.getElementById('btnCrearUsuario').onclick = async () => {
   const cuerpo = {
     usuario: document.getElementById('nuUsuario').value, clave: document.getElementById('nuClave').value,
-    rol: document.getElementById('nuRol').value, perfilId: Number(document.getElementById('nuPerfil').value),
+    rol: 'empresa', perfilId: Number(document.getElementById('nuPerfil').value),
   };
   try {
     const u = await api('/api/usuarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
@@ -283,7 +281,18 @@ document.getElementById('btnCrearUsuario').onclick = async () => {
   } catch (e) { msgU(esc(e.message), 'err'); }
 };
 
-cargar().then(cargarUsuarios);
+// Usuario de compañía: ve la configuración de su compañía en solo lectura.
+function soloLectura() {
+  for (const id of ['btnNuevo', 'btnActivar', 'btnEliminar', 'btnGuardar', 'btnProbar', 'panelUsuarios']) document.getElementById(id).hidden = true;
+  form.querySelectorAll('input, select, textarea').forEach((el) => { el.disabled = true; });
+  form.onsubmit = (ev) => ev.preventDefault();
+  document.querySelector('.panel .ayuda').textContent = 'Configuración de tu compañía (solo lectura). Si algo debe cambiar, pídeselo al administrador.';
+}
+
+api('/api/estado').then(({ usuario }) => {
+  if (usuario.rol === 'admin') return cargar().then(cargarUsuarios);
+  return cargar().then(soloLectura);
+});
 </script>
 </body>
 </html>

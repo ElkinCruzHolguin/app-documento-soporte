@@ -34,9 +34,8 @@ async function pintarBanner() {
   try {
     const { perfil, usuario } = await api('/api/estado');
     const esAdmin = usuario.rol === 'admin';
-    // Administración solo para el administrador (el servidor también lo impide).
-    document.querySelectorAll('[data-solo-admin]').forEach((a) => { a.hidden = !esAdmin; });
-    if (document.body.dataset.soloAdmin !== undefined && !esAdmin) { location.href = 'index.html'; return; }
+    // Un usuario de compañía ve la configuración de la suya en solo lectura (el servidor impide modificarla).
+    if (!esAdmin) document.querySelectorAll('[data-enlace-admin]').forEach((a) => { a.textContent = 'Mi compañía'; });
     const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>'
       : perfil.modoEnvio === 'real' ? '<span class="chip real">ENVÍO REAL</span>' : '<span class="chip simulado">Modo simulado</span>';
     const quien = usuario.login

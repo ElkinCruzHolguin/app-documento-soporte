@@ -108,9 +108,16 @@ app.use('/api', envolver(async (req, res, next) => {
   next();
 }));
 
-const soloAdmin = (req, res, next) => (req.usuario.rol === 'admin' ? next() : res.status(403).json({ error: 'Solo el administrador puede hacer esto.' }));
-app.use('/api/perfiles', soloAdmin);
-app.use('/api/usuarios', soloAdmin);
+// Solo el administrador crea o modifica compañías y usuarios. Un usuario de compañía puede
+// consultar (solo lectura) la configuración de la suya, nunca la de otra.
+const prohibido = (res) => res.status(403).json({ error: 'Solo el administrador puede modificar compañías y usuarios.' });
+app.use('/api/perfiles', (req, res, next) => {
+  if (req.usuario.rol === 'admin') return next();
+  const id = Number(req.path.split('/')[1]);
+  if (req.method === 'GET' && (req.path === '/' || id === req.usuario.perfilId)) return next();
+  return prohibido(res);
+});
+app.use('/api/usuarios', (req, res, next) => (req.usuario.rol === 'admin' ? next() : prohibido(res)));
 
 // ================= Perfiles (Administración) =================
 const CAMPOS_NUMERICOS = ['siguienteConsecutivo'];
@@ -127,7 +134,11 @@ function limpiarConfig(entrada) {
   return c;
 }
 
-app.get('/api/perfiles', envolver(async (req, res) => res.json(await perfiles.listar())));
+app.get('/api/perfiles', envolver(async (req, res) => {
+  if (req.usuario.rol === 'admin') return res.json(await perfiles.listar());
+  const propio = await perfiles.obtener(req.usuario.perfilId);
+  res.json(propio ? [propio] : []);
+}));
 
 app.post('/api/perfiles', envolver(async (req, res) => {
   const { nombre, config, clave } = req.body || {};
@@ -275,7 +286,8 @@ app.get('/api/estado', envolver(async (req, res) => {
 }));
 
 // ================= Usuarios (solo administrador) =================
-const ROLES = ['admin', 'empresa'];
+// Los usuarios creados aquí son siempre de compañía: el único administrador es APP_USUARIO.
+const ROLES = ['empresa'];
 async function validarUsuario({ rol, perfilId }) {
   if (!ROLES.includes(rol)) throw fallo(400, 'Rol inválido.');
   if (rol === 'empresa' && !(await perfiles.obtener(perfilId))) throw fallo(400, 'Elige la compañía del usuario.');
