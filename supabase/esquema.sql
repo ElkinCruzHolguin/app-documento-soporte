@@ -32,7 +32,10 @@ create table if not exists public.envios (
   documento jsonb, -- JSON enviado a Saphety
   respuesta jsonb  -- respuesta de Saphety (incluye el XML en base64)
 );
+-- Número del documento en el Excel (PREFIJO + FOLIO); puede diferir de "numero" con el consecutivo de pruebas.
+alter table public.envios add column if not exists numero_excel text;
 create index if not exists envios_creado_en on public.envios (creado_en desc);
+create index if not exists envios_numero_excel on public.envios (nit_adquiriente, numero_excel) where modo = 'real';
 create index if not exists envios_aceptados on public.envios (nit_adquiriente, numero) where modo = 'real' and estado = 'aceptado';
 
 alter table public.perfiles enable row level security;

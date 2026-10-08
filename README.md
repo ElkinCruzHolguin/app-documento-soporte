@@ -32,7 +32,7 @@ La contraseña de Saphety se escribe en Administración, se guarda cifrada (AES-
 
 4. **Historial**: cada envío real queda guardado con el JSON enviado, la respuesta de Saphety y el XML. El Excel y los envíos simulados no se guardan.
 
-Protecciones: números repetidos dentro del mismo archivo se marcan como error; un número que Saphety ya aceptó (según el historial, para el mismo NIT) se marca como error y no se reenvía; si falla el token se detiene el envío.
+Protecciones: números repetidos dentro del mismo archivo se marcan como error; un documento del Excel (PREFIJO + FOLIO) que Saphety ya aceptó, con cualquier numeración, se marca como error y no se reenvía; si su último envío quedó con error de conexión se muestra un aviso para revisarlo en Saphety; si falla el token se detiene el envío.
 
 ## Mapeo Excel → JSON
 | Columna del Excel | Campo Saphety |

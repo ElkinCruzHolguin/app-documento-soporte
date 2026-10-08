@@ -5,7 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { DEFAULTS, conDefaults } = require('../config');
 const { llaveDesdeTexto, crearCifrador } = require('../cifrado');
-const { publico, resumenEnvio, fallo } = require('./comun');
+const { publico, resumenEnvio, fallo, resumirPrevios } = require('./comun');
 
 function crearAlmacenArchivo(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -88,15 +88,15 @@ function crearAlmacenArchivo(dir) {
       guardarJson(ARCHIVO_ENVIOS, lista);
       return id;
     },
-    /** Números (de la lista) que ya fueron aceptados por Saphety en envío real para ese NIT. */
-    aceptados: async (nit, numeros) => {
-      const buscados = new Set(numeros);
-      return new Set(leerEnvios().filter((e) => e.modo === 'real' && e.estado === 'aceptado' && e.nitAdquiriente === nit && buscados.has(e.numero)).map((e) => e.numero));
+    /** Envíos reales previos de esos números del Excel para ese NIT (ver resumirPrevios). */
+    previos: async (nit, numerosExcel) => {
+      const buscados = new Set(numerosExcel);
+      return resumirPrevios(leerEnvios().filter((e) => e.modo === 'real' && e.nitAdquiriente === nit), buscados);
     },
     listar: async ({ buscar = '', limite = 100 } = {}) => {
       const q = buscar.toUpperCase();
       return leerEnvios()
-        .filter((e) => !q || [e.numero, e.proveedor, e.identificacion].some((v) => String(v || '').toUpperCase().includes(q)))
+        .filter((e) => !q || [e.numero, e.numeroExcel, e.proveedor, e.identificacion].some((v) => String(v || '').toUpperCase().includes(q)))
         .sort((a, b) => b.id - a.id)
         .slice(0, limite)
         .map(resumenEnvio);

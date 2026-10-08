@@ -137,16 +137,35 @@ test('flujo completo', async () => {
 
     // Consecutivo de pruebas: se reserva y se incrementa solo en envíos reales
     await llamar(`/api/perfiles/${perfil.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: { numeracion: 'consecutivo', prefijoConsecutivo: 'SEDS', siguienteConsecutivo: 984000010 } }) });
-    const c1 = await enviar(docs[0], { confirmado: true });
+    // DSE7460 ya fue aceptado: también se bloquea con consecutivo y no gasta número
+    const bloqueado = await enviar(docs[0], { confirmado: true });
+    assert.strictEqual(bloqueado.datos.estado, 'con_errores');
+    // DSE7461 fue rechazado: se puede reenviar, ahora con el consecutivo
+    const c1 = await enviar(docs[1], { confirmado: true });
     assert.strictEqual(c1.datos.numero, 'SEDS984000010');
-    const c2 = await enviar(docs[0], { confirmado: true });
-    assert.strictEqual(c2.datos.numero, 'SEDS984000011');
+    assert.strictEqual(c1.datos.estado, 'aceptado');
+    // Volver a enviar el mismo documento del Excel: bloqueado aunque el consecutivo sería otro
+    const c2 = await enviar(docs[1], { confirmado: true });
+    assert.strictEqual(c2.datos.estado, 'con_errores');
+    assert.match(c2.datos.errores[0], /DSE7461 ya fue aceptado por Saphety como SEDS984000010/);
+    const otro = await enviar({ datos: { ...docs[0].datos, prefijoFolio: 7470 } }, { confirmado: true });
+    assert.strictEqual(otro.datos.numero, 'SEDS984000011');
+    const conv3 = (await llamar('/api/convertir', { method: 'POST', body: await excelDePrueba() })).datos.documentos;
+    assert.deepStrictEqual(conv3.map((d) => d.errores.some((e) => /ya fue aceptado/.test(e))), [true, true, false]);
+    const hist2 = (await llamar('/api/envios?buscar=DSE7461')).datos;
+    assert.strictEqual(hist2[0].numero, 'SEDS984000010');
+    assert.strictEqual(hist2[0].numeroExcel, 'DSE7461');
 
     // Token inválido: se avisa que hay que detener el lote
     await llamar(`/api/perfiles/${perfil.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clave: 'otra' }) });
-    const sinToken = await enviar(docs[0], { confirmado: true });
+    const sinToken = await enviar({ datos: { ...docs[0].datos, prefijoFolio: 7471 } }, { confirmado: true });
     assert.strictEqual(sinToken.datos.estado, 'error_envio');
     assert.strictEqual(sinToken.datos.detener, true);
+    // El error de envío queda en el historial y la fila muestra un aviso (no bloquea)
+    const { crearAlmacenArchivo } = require('../src/almacen/archivo');
+    const previos = await crearAlmacenArchivo(process.env.DATA_DIR).envios.previos('860031699', ['DSE7471', 'DSE7460']);
+    assert.deepStrictEqual(previos.get('DSE7471'), { aceptadoComo: null, errorEnvio: true });
+    assert.deepStrictEqual(previos.get('DSE7460'), { aceptadoComo: 'DSE7460', errorEnvio: false });
   } finally {
     sApp.close();
     sMock.close();

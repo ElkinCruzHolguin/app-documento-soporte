@@ -52,6 +52,8 @@ const envolver = (fn) => async (req, res) => {
 };
 const fallo = (status, mensaje) => Object.assign(new Error(mensaje), { status });
 const soloDigitos = (v) => String(v || '').replace(/\D/g, '');
+const mensajeYaAceptado = (numeroExcel, aceptadoComo) =>
+  `El documento ${numeroExcel} ya fue aceptado por Saphety${aceptadoComo !== numeroExcel ? ` como ${aceptadoComo}` : ''} (ver Historial).`;
 
 async function perfilActivo() {
   const p = await perfiles.activo();
@@ -140,10 +142,14 @@ app.post('/api/convertir', express.raw({ type: () => true, limit: '30mb' }), env
     return { fila: numeroFila, datos, ...v.resumen, errores: v.errores, advertencias: v.advertencias, json: v.json };
   });
 
-  // Con la numeración del Excel, el historial dice qué números ya aceptó Saphety.
-  if (perfil.config.numeracion !== 'consecutivo' && perfil.config.nit) {
-    const ya = await envios.aceptados(soloDigitos(perfil.config.nit), [...vistos]);
-    for (const d of documentos) if (ya.has(d.numero)) d.errores.push(`El número ${d.numero} ya fue aceptado por Saphety (ver Historial).`);
+  // El historial dice qué documentos del Excel (PREFIJO + FOLIO) ya se enviaron, en cualquier modo de numeración.
+  if (perfil.config.nit) {
+    const previos = await envios.previos(soloDigitos(perfil.config.nit), [...vistos]);
+    for (const d of documentos) {
+      const p = previos.get(d.numero);
+      if (p && p.aceptadoComo) d.errores.push(mensajeYaAceptado(d.numero, p.aceptadoComo));
+      else if (p && p.errorEnvio) d.advertencias.push(`El último envío de ${d.numero} quedó con error de conexión: revisa en Saphety si se creó antes de reenviarlo.`);
+    }
   }
   res.json({ hoja: excel.hoja, columnas: excel.columnas, documentos });
 }));
@@ -162,8 +168,10 @@ app.post('/api/enviar', envolver(async (req, res) => {
   const previa = construirDocumento(datos, cfg);
   if (previa.errores.length) return res.json({ estado: 'con_errores', errores: previa.errores, json: previa.json });
   const nit = soloDigitos(cfg.nit);
-  if (real && cfg.numeracion !== 'consecutivo' && (await envios.aceptados(nit, [previa.resumen.numero])).has(previa.resumen.numero)) {
-    return res.json({ estado: 'con_errores', errores: [`El número ${previa.resumen.numero} ya fue aceptado por Saphety (ver Historial).`], json: previa.json });
+  const numeroExcel = previa.resumen.numero;
+  if (real) {
+    const p = (await envios.previos(nit, [numeroExcel])).get(numeroExcel);
+    if (p && p.aceptadoComo) return res.json({ estado: 'con_errores', errores: [mensajeYaAceptado(numeroExcel, p.aceptadoComo)], json: previa.json });
   }
 
   let numeracion;
@@ -182,7 +190,7 @@ app.post('/api/enviar', envolver(async (req, res) => {
   if (real) {
     try {
       salida.envioId = await envios.registrar({
-        perfilId: perfil.id, perfilNombre: perfil.nombre, modo: 'real', estado: r.estado, numero, nitAdquiriente: nit,
+        perfilId: perfil.id, perfilNombre: perfil.nombre, modo: 'real', estado: r.estado, numero, numeroExcel, nitAdquiriente: nit,
         proveedor: resumen.proveedor, identificacion: resumen.identificacion, valor: resumen.valor,
         saphetyId: r.saphetyId || null, cuds: r.cuds || null, mensaje: r.mensaje || '', documento: json, respuesta: r.respuesta || null,
       });

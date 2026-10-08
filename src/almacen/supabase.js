@@ -5,7 +5,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { DEFAULTS, conDefaults } = require('../config');
 const { llaveDesdeTexto, crearCifrador } = require('../cifrado');
-const { publico, resumenEnvio, fallo } = require('./comun');
+const { publico, resumenEnvio, fallo, resumirPrevios } = require('./comun');
 
 function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
   if (!secreto) throw new Error('Falta la variable APP_SECRETO (llave para cifrar la contraseña de Saphety).');
@@ -66,32 +66,35 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
 
   const aEnvio = (f) => f && ({
     id: f.id, creadoEn: f.creado_en, perfilId: f.perfil_id, perfilNombre: f.perfil_nombre, modo: f.modo, estado: f.estado,
-    numero: f.numero, nitAdquiriente: f.nit_adquiriente, proveedor: f.proveedor, identificacion: f.identificacion,
+    numero: f.numero, numeroExcel: f.numero_excel, nitAdquiriente: f.nit_adquiriente, proveedor: f.proveedor, identificacion: f.identificacion,
     valor: f.valor == null ? null : Number(f.valor), saphetyId: f.saphety_id, cuds: f.cuds, mensaje: f.mensaje,
     documento: f.documento, respuesta: f.respuesta,
   });
 
   const envios = {
     registrar: async (r) => revisar(await db.from('envios').insert({
-      perfil_id: r.perfilId, perfil_nombre: r.perfilNombre, modo: r.modo, estado: r.estado, numero: r.numero,
+      perfil_id: r.perfilId, perfil_nombre: r.perfilNombre, modo: r.modo, estado: r.estado, numero: r.numero, numero_excel: r.numeroExcel,
       nit_adquiriente: r.nitAdquiriente, proveedor: r.proveedor, identificacion: r.identificacion, valor: r.valor,
       saphety_id: r.saphetyId, cuds: r.cuds, mensaje: r.mensaje, documento: r.documento, respuesta: r.respuesta,
     }).select('id').single()).id,
-    aceptados: async (nit, numeros) => {
-      const encontrados = new Set();
-      for (let i = 0; i < numeros.length; i += 200) {
-        const filas = revisar(await db.from('envios').select('numero')
-          .eq('modo', 'real').eq('estado', 'aceptado').eq('nit_adquiriente', nit).in('numero', numeros.slice(i, i + 200)));
-        for (const f of filas) encontrados.add(f.numero);
+    previos: async (nit, numerosExcel) => {
+      const filas = new Map(); // id -> fila (una fila puede salir por numero_excel y por numero)
+      for (let i = 0; i < numerosExcel.length; i += 200) {
+        const lote = numerosExcel.slice(i, i + 200);
+        for (const columna of ['numero_excel', 'numero']) {
+          const r = revisar(await db.from('envios').select('id, numero, numero_excel, estado')
+            .eq('modo', 'real').eq('nit_adquiriente', nit).in(columna, lote));
+          for (const f of r) filas.set(f.id, { id: f.id, numero: f.numero, numeroExcel: f.numero_excel, estado: f.estado });
+        }
       }
-      return encontrados;
+      return resumirPrevios([...filas.values()], new Set(numerosExcel));
     },
     listar: async ({ buscar = '', limite = 100 } = {}) => {
       let q = db.from('envios')
-        .select('id, creado_en, perfil_nombre, modo, estado, numero, proveedor, identificacion, valor, saphety_id, cuds, mensaje')
+        .select('id, creado_en, perfil_nombre, modo, estado, numero, numero_excel, proveedor, identificacion, valor, saphety_id, cuds, mensaje')
         .order('id', { ascending: false }).limit(limite);
       const b = buscar.replace(/[^\p{L}\p{N} .-]/gu, '').trim();
-      if (b) q = q.or(`numero.ilike.*${b}*,proveedor.ilike.*${b}*,identificacion.ilike.*${b}*`);
+      if (b) q = q.or(`numero.ilike.*${b}*,numero_excel.ilike.*${b}*,proveedor.ilike.*${b}*,identificacion.ilike.*${b}*`);
       return revisar(await q).map(aEnvio).map(resumenEnvio);
     },
     obtener: async (id) => aEnvio(revisar(await db.from('envios').select('*').eq('id', Number(id)).maybeSingle())),
