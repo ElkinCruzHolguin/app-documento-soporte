@@ -81,8 +81,8 @@ test('proveedor no residente: ciudad del Excel, capital del país o error', () =
   assert.ok(Object.keys(CAPITALES).length >= 240);
   for (const [codigo, u] of Object.entries(CAPITALES)) assert.ok(/^[A-Z]{2}$/.test(codigo) && u.ciudad && u.departamento, codigo);
 
-  // País sin capital conocida ni valor por defecto: error
-  assert.ok(construirDocumento({ ...nuevo, pais: 'ZZ' }, CFG).errores.some((e) => e.includes('falta ciudad')));
+  // Código de país que no existe: error
+  assert.ok(construirDocumento({ ...nuevo, pais: 'ZZ' }, CFG).errores.some((e) => e.includes('no es un país válido')));
 });
 
 test('validaciones de configuración', () => {

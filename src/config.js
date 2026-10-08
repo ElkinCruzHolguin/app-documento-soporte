@@ -32,8 +32,6 @@ const DEFAULTS = {
   medioPagoForma: '1', // PaymentMeans.Mean (1 contado, 2 crédito)
   unidadMedida: 'NAR',
   incluirIvaCero: true, // informa IVA 01 al 0 % en la línea y en el total
-  ciudadExtranjeroDefecto: '', // no residentes de un país sin capital en src/capitales.js
-  departamentoExtranjeroDefecto: '',
   incluirTelefono: true,
 
   // Tipo de documento DIAN (columna TIPO DE DOCUMENTO) -> DocumentType de Saphety
@@ -50,8 +48,8 @@ const DEFAULTS = {
 function conDefaults(config) {
   const c = { ...DEFAULTS, ...(config || {}) };
   c.tiposDocumento = { ...DEFAULTS.tiposDocumento, ...((config && config.tiposDocumento) || {}) };
-  // Tabla de ubicaciones de extranjeros retirada: ahora se usa la capital del país (src/capitales.js).
-  delete c.ubicacionesExtranjeros;
+  // Campos retirados (ubicación de extranjeros): ahora se usa la capital del país (src/capitales.js).
+  for (const k of ['ubicacionesExtranjeros', 'ciudadExtranjeroDefecto', 'departamentoExtranjeroDefecto']) delete c[k];
   return c;
 }
 

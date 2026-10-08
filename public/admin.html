@@ -92,12 +92,10 @@
         <div><label>Medio de pago (PaymentMeans.Code)</label><input name="medioPagoCodigo"></div>
         <div><label>Forma de pago (PaymentMeans.Mean)</label><input name="medioPagoForma"><div class="ayuda">1 contado, 2 crédito.</div></div>
         <div><label>Unidad de medida</label><input name="unidadMedida"></div>
-        <div><label>Ciudad por defecto (no residentes)</label><input name="ciudadExtranjeroDefecto"></div>
-        <div><label>Departamento/estado por defecto (no residentes)</label><input name="departamentoExtranjeroDefecto"></div>
         <div><label>Informar IVA 0 %</label><select name="incluirIvaCero"><option value="true">Sí</option><option value="false">No</option></select></div>
         <div><label>Enviar teléfono del proveedor</label><select name="incluirTelefono"><option value="true">Sí</option><option value="false">No</option></select></div>
       </div>
-      <p class="ayuda">Proveedores no residentes: si el Excel no trae ciudad, se usa la capital de su país (México → Ciudad de México, Panamá → Ciudad de Panamá…) y la fila muestra un aviso. La lista tiene todos los países; la ciudad por defecto solo se usaría si la columna PAIS trae un código que no existe. Se recomienda dejarla vacía.</p>
+      <p class="ayuda">Proveedores no residentes: si el Excel no trae ciudad, se usa la capital de su país (México → Ciudad de México, Panamá → Ciudad de Panamá…) y la fila muestra un aviso. Si el código de PAIS no existe, la fila sale con error.</p>
       <h3>Tipo de documento DIAN → DocumentType de Saphety</h3>
       <textarea name="tiposDocumento" rows="8"></textarea>
       <div class="fila-botones">
