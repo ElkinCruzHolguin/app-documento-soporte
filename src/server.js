@@ -5,6 +5,7 @@ const express = require('express');
 const { leerExcel } = require('./excel');
 const { construirDocumento } = require('./mapper');
 const { crearAlmacen } = require('./almacen');
+const sesion = require('./sesion');
 const saphety = require('./saphety');
 
 const app = express();
@@ -18,33 +19,26 @@ let almacenCreado;
 const almacen = () => (almacenCreado ||= crearAlmacen());
 const perfiles = new Proxy({}, { get: (_, k) => almacen().perfiles[k] });
 const envios = new Proxy({}, { get: (_, k) => almacen().envios[k] });
+const usuarios = new Proxy({}, { get: (_, k) => almacen().usuarios[k] });
 
-// ---- Acceso: autenticación básica si se definen APP_USUARIO y APP_CLAVE.
-function igualSeguro(a, b) {
-  const x = crypto.createHash('sha256').update(String(a)).digest();
-  const y = crypto.createHash('sha256').update(String(b)).digest();
-  return crypto.timingSafeEqual(x, y);
-}
-if (USUARIO_APP && CLAVE_APP) {
-  app.use((req, res, next) => {
-    const [tipo, valor] = String(req.headers.authorization || '').split(' ');
-    if (tipo === 'Basic' && valor) {
-      const [u, ...resto] = Buffer.from(valor, 'base64').toString('utf8').split(':');
-      if (igualSeguro(u, USUARIO_APP) && igualSeguro(resto.join(':'), CLAVE_APP)) return next();
-    }
-    res.set('WWW-Authenticate', 'Basic realm="Documentos soporte", charset="UTF-8"').status(401).send('Autenticación requerida');
-  });
-} else if (process.env.VERCEL) {
-  // Publicada en internet sin usuario y clave: no se atiende nada.
+// ---- Acceso: si se definen APP_USUARIO y APP_CLAVE (obligatorio en Vercel) se pide inicio de sesión.
+// APP_USUARIO es el super administrador; los usuarios de cada compañía se crean en Administración › Usuarios.
+// Sin esas variables (solo en local) no hay inicio de sesión y se trabaja como administrador.
+const AUTENTICACION = !!(USUARIO_APP && CLAVE_APP);
+const firmador = sesion.crearFirmador(process.env.APP_SECRETO);
+const COOKIE_SEGURA = !!process.env.VERCEL;
+const HASH_FALSO = sesion.hashClave(crypto.randomBytes(16).toString('hex')); // iguala el tiempo si el usuario no existe
+if (!AUTENTICACION && process.env.VERCEL) {
+  // Publicada en internet sin super administrador: no se atiende nada.
   app.use((req, res) => res.status(503).send('Configura APP_USUARIO y APP_CLAVE en las variables de entorno de Vercel.'));
 }
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-const envolver = (fn) => async (req, res) => {
+const envolver = (fn) => async (req, res, next) => {
   try {
-    await fn(req, res);
+    await fn(req, res, next);
   } catch (e) {
     if (!e.status) console.error(e);
     res.status(e.status || 500).json({ error: e.message });
@@ -55,11 +49,68 @@ const soloDigitos = (v) => String(v || '').replace(/\D/g, '');
 const mensajeYaAceptado = (numeroExcel, aceptadoComo) =>
   `El documento ${numeroExcel} ya fue aceptado por Saphety${aceptadoComo !== numeroExcel ? ` como ${aceptadoComo}` : ''} (ver Historial).`;
 
-async function perfilActivo() {
-  const p = await perfiles.activo();
-  if (!p) throw fallo(400, 'No hay un perfil activo. Crea o activa uno en Administración.');
+// El administrador trabaja con el perfil activo; un usuario de compañía, siempre con el suyo.
+const perfilDe = (req) => (req.usuario.rol === 'admin' ? perfiles.activo() : perfiles.obtener(req.usuario.perfilId));
+async function perfilActivo(req) {
+  const p = await perfilDe(req);
+  if (!p) throw fallo(400, req.usuario.rol === 'admin' ? 'No hay un perfil activo. Crea o activa uno en Administración.' : 'Tu usuario no tiene un perfil asignado. Contacta al administrador.');
   return p;
 }
+
+// ================= Inicio de sesión =================
+app.post('/api/login', envolver(async (req, res) => {
+  const usuario = String((req.body && req.body.usuario) || '').trim().toLowerCase();
+  const clave = String((req.body && req.body.clave) || '');
+  if (!AUTENTICACION) return res.json({ ok: true, rol: 'admin' });
+  const llave = `${req.ip}|${usuario}`;
+  if (sesion.bloqueado(llave)) throw fallo(429, 'Demasiados intentos fallidos. Espera 15 minutos e inténtalo de nuevo.');
+  let datos = null;
+  if (sesion.igualSeguro(usuario, USUARIO_APP.toLowerCase()) && sesion.igualSeguro(clave, CLAVE_APP)) {
+    datos = { id: 0, usuario, rol: 'admin', perfilId: null };
+  } else {
+    const u = await usuarios.porNombre(usuario);
+    const ok = sesion.verificarClave(clave, u ? u.claveHash : HASH_FALSO);
+    if (u && ok && u.activo) {
+      datos = { id: u.id, usuario: u.usuario, rol: u.rol, perfilId: u.perfilId };
+      await usuarios.actualizar(u.id, { ultimoIngreso: new Date().toISOString() });
+    }
+  }
+  if (!datos) {
+    sesion.registrarFallo(llave);
+    throw fallo(401, 'Usuario o contraseña incorrectos.');
+  }
+  sesion.limpiarFallos(llave);
+  res.set('Set-Cookie', sesion.cookieSesion(firmador.emitir(datos), { segura: COOKIE_SEGURA })).json({ ok: true, rol: datos.rol });
+}));
+
+app.post('/api/logout', (req, res) => {
+  res.set('Set-Cookie', sesion.cookieSesion('', { segura: COOKIE_SEGURA })).json({ ok: true });
+});
+
+// Todo lo demás de /api exige sesión. Los usuarios de compañía se revalidan en cada petición
+// para que desactivarlos o cambiarles el perfil tenga efecto inmediato.
+app.use('/api', envolver(async (req, res, next) => {
+  if (!AUTENTICACION) {
+    req.usuario = { id: 0, usuario: 'local', rol: 'admin', perfilId: null };
+    return next();
+  }
+  const d = firmador.leer(sesion.leerCookie(req, sesion.COOKIE));
+  let valido = !!d;
+  if (d && d.id) {
+    const u = await usuarios.obtener(d.id);
+    valido = !!u && u.activo && u.rol === d.rol && (u.perfilId ?? null) === (d.perfilId ?? null);
+  }
+  if (!valido) {
+    res.set('Set-Cookie', sesion.cookieSesion('', { segura: COOKIE_SEGURA }));
+    throw fallo(401, 'Tu sesión terminó. Inicia sesión de nuevo.');
+  }
+  req.usuario = d;
+  next();
+}));
+
+const soloAdmin = (req, res, next) => (req.usuario.rol === 'admin' ? next() : res.status(403).json({ error: 'Solo el administrador puede hacer esto.' }));
+app.use('/api/perfiles', soloAdmin);
+app.use('/api/usuarios', soloAdmin);
 
 // ================= Perfiles (Administración) =================
 const CAMPOS_NUMERICOS = ['siguienteConsecutivo'];
@@ -124,7 +175,7 @@ app.get('/api/perfiles/:id/catalogo/:nombre', envolver(async (req, res) => {
 // ================= Conversión: Excel -> JSON (no se guarda nada) =================
 app.post('/api/convertir', express.raw({ type: () => true, limit: '30mb' }), envolver(async (req, res) => {
   if (!req.body || !req.body.length) throw fallo(400, 'No llegó ningún archivo.');
-  const perfil = await perfilActivo();
+  const perfil = await perfilActivo(req);
   let excel;
   try {
     excel = await leerExcel(req.body);
@@ -159,7 +210,7 @@ app.post('/api/convertir', express.raw({ type: () => true, limit: '30mb' }), env
 app.post('/api/enviar', envolver(async (req, res) => {
   const { datos, confirmado, indice } = req.body || {};
   if (!datos || typeof datos !== 'object') throw fallo(400, 'Faltan los datos de la fila.');
-  const perfil = await perfilActivo();
+  const perfil = await perfilActivo(req);
   const cfg = perfil.config;
   const real = cfg.modoEnvio === 'real';
   if (real && !confirmado) throw fallo(400, 'El envío real necesita confirmación.');
@@ -205,18 +256,67 @@ app.post('/api/enviar', envolver(async (req, res) => {
 // ================= Historial de envíos reales =================
 app.get('/api/envios', envolver(async (req, res) => {
   const limite = Math.min(Math.max(Number(req.query.limite) || 100, 1), 500);
-  res.json(await envios.listar({ buscar: String(req.query.buscar || ''), limite }));
+  const perfilId = req.usuario.rol === 'admin' ? null : req.usuario.perfilId;
+  res.json(await envios.listar({ buscar: String(req.query.buscar || ''), limite, perfilId }));
 }));
 
 app.get('/api/envios/:id', envolver(async (req, res) => {
   const e = await envios.obtener(req.params.id);
-  if (!e) throw fallo(404, 'Envío no encontrado.');
+  if (!e || (req.usuario.rol !== 'admin' && e.perfilId !== req.usuario.perfilId)) throw fallo(404, 'Envío no encontrado.');
   res.json(e);
 }));
 
 app.get('/api/estado', envolver(async (req, res) => {
-  const p = await perfiles.activo();
-  res.json({ perfil: p && { id: p.id, nombre: p.nombre, modoEnvio: p.config.modoEnvio, url: p.config.url, numeracion: p.config.numeracion } });
+  const p = await perfilDe(req);
+  res.json({
+    usuario: { usuario: req.usuario.usuario, rol: req.usuario.rol, login: AUTENTICACION },
+    perfil: p && { id: p.id, nombre: p.nombre, modoEnvio: p.config.modoEnvio, url: p.config.url, numeracion: p.config.numeracion },
+  });
+}));
+
+// ================= Usuarios (solo administrador) =================
+const ROLES = ['admin', 'empresa'];
+async function validarUsuario({ rol, perfilId }) {
+  if (!ROLES.includes(rol)) throw fallo(400, 'Rol inválido.');
+  if (rol === 'empresa' && !(await perfiles.obtener(perfilId))) throw fallo(400, 'Elige el perfil (compañía) del usuario.');
+}
+function validarClave(clave) {
+  if (String(clave || '').length < 10) throw fallo(400, 'La contraseña debe tener al menos 10 caracteres.');
+}
+
+app.get('/api/usuarios', envolver(async (req, res) => res.json(await usuarios.listar())));
+
+app.post('/api/usuarios', envolver(async (req, res) => {
+  const { clave, rol = 'empresa' } = req.body || {};
+  const usuario = String((req.body && req.body.usuario) || '').trim().toLowerCase();
+  if (!/^[a-z0-9._@-]{3,60}$/.test(usuario)) throw fallo(400, 'El usuario debe tener entre 3 y 60 caracteres: letras, números, punto, guion, guion bajo o @.');
+  if (USUARIO_APP && usuario === USUARIO_APP.toLowerCase()) throw fallo(400, 'Ese nombre está reservado para el super administrador.');
+  validarClave(clave);
+  const perfilId = rol === 'empresa' ? Number(req.body.perfilId) : null;
+  await validarUsuario({ rol, perfilId });
+  res.json(await usuarios.crear({ usuario, claveHash: sesion.hashClave(clave), rol, perfilId }));
+}));
+
+app.put('/api/usuarios/:id', envolver(async (req, res) => {
+  const actual = await usuarios.obtener(req.params.id);
+  if (!actual) throw fallo(404, 'Usuario no encontrado.');
+  const b = req.body || {};
+  const cambios = {};
+  if (b.clave) { validarClave(b.clave); cambios.claveHash = sesion.hashClave(b.clave); }
+  if ('activo' in b) cambios.activo = !!b.activo;
+  if ('rol' in b || 'perfilId' in b) {
+    const rol = b.rol || actual.rol;
+    const perfilId = rol === 'empresa' ? Number(b.perfilId ?? actual.perfilId) : null;
+    await validarUsuario({ rol, perfilId });
+    Object.assign(cambios, { rol, perfilId });
+  }
+  res.json(await usuarios.actualizar(actual.id, cambios));
+}));
+
+app.delete('/api/usuarios/:id', envolver(async (req, res) => {
+  if (!(await usuarios.obtener(req.params.id))) throw fallo(404, 'Usuario no encontrado.');
+  await usuarios.eliminar(req.params.id);
+  res.json({ ok: true });
 }));
 
 app.use((err, req, res, next) => {

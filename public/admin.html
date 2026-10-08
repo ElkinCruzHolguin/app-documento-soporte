@@ -7,10 +7,10 @@
 <link rel="stylesheet" href="app.css">
 <script src="comun.js"></script>
 </head>
-<body>
+<body data-solo-admin>
 <header>
   <h1>Documentos soporte · Saphety</h1>
-  <nav><a href="index.html">Cargar y enviar</a><a href="historial.html">Historial</a><a href="admin.html" class="activo">Administración</a></nav>
+  <nav><a href="index.html">Cargar y enviar</a><a href="historial.html">Historial</a><a href="admin.html" class="activo" data-solo-admin>Administración</a></nav>
   <div id="banner"></div>
 </header>
 <main>
@@ -107,6 +107,27 @@
 
     <div class="fila-botones"><button type="submit">Guardar</button></div>
   </form>
+
+  <section class="panel" id="panelUsuarios">
+    <h2>Usuarios</h2>
+    <p class="ayuda">Un usuario de compañía solo trabaja con su perfil: carga y envía con él y solo ve su historial. No puede entrar a Administración ni cambiar parámetros. Un usuario administrador ve todo, igual que tú.</p>
+    <div id="msgUsuarios"></div>
+    <div class="tabla-scroll">
+      <table>
+        <thead><tr><th>Usuario</th><th>Rol</th><th>Perfil (compañía)</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead>
+        <tbody id="filasUsuarios"></tbody>
+      </table>
+    </div>
+    <h3>Nuevo usuario</h3>
+    <div class="rejilla">
+      <div><label for="nuUsuario">Usuario</label><input id="nuUsuario" autocomplete="off" placeholder="p. ej. vitro"></div>
+      <div><label for="nuClave">Contraseña (mínimo 10 caracteres)</label><input id="nuClave" autocomplete="new-password">
+        <div class="ayuda"><a href="#" id="btnGenerar">Generar una segura</a> · cópiala y entrégala a la compañía: después no se puede ver.</div></div>
+      <div><label for="nuRol">Rol</label><select id="nuRol"><option value="empresa">Compañía</option><option value="admin">Administrador</option></select></div>
+      <div id="cajaPerfil"><label for="nuPerfil">Perfil (compañía)</label><select id="nuPerfil"></select></div>
+    </div>
+    <div class="fila-botones"><button type="button" id="btnCrearUsuario">Crear usuario</button></div>
+  </section>
 </main>
 <script>
 let perfiles = [];
@@ -202,7 +223,67 @@ document.getElementById('btnCatalogo').onclick = async () => {
   } catch (e) { pre.textContent = e.message; }
 };
 
-cargar();
+// ================= Usuarios =================
+const msgU = (html, tipo = 'ok') => { document.getElementById('msgUsuarios').innerHTML = html ? `<div class="aviso ${tipo}">${html}</div>` : ''; };
+const fechaHora = (iso) => (iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : '—');
+const opcionesPerfil = (sel) => perfiles.map((p) => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('');
+
+function claveAleatoria() {
+  const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const n = crypto.getRandomValues(new Uint32Array(14));
+  return Array.from(n, (x) => letras[x % letras.length]).join('');
+}
+
+async function cargarUsuarios() {
+  try {
+    const lista = await api('/api/usuarios');
+    document.getElementById('nuPerfil').innerHTML = opcionesPerfil();
+    document.getElementById('filasUsuarios').innerHTML = lista.length ? lista.map((u) => `<tr data-id="${u.id}">
+      <td><b>${esc(u.usuario)}</b></td>
+      <td>${u.rol === 'admin' ? 'Administrador' : 'Compañía'}</td>
+      <td>${u.rol === 'admin' ? '— (todos)' : `<select class="selPerfilU" style="max-width:220px">${opcionesPerfil(u.perfilId)}</select>`}</td>
+      <td>${u.activo ? '<span class="chip aceptado">Activo</span>' : '<span class="chip con_errores">Desactivado</span>'}</td>
+      <td>${esc(fechaHora(u.ultimoIngreso))}</td>
+      <td style="white-space:nowrap">
+        <button class="secundario btnClave">Cambiar contraseña</button>
+        <button class="secundario btnActivo">${u.activo ? 'Desactivar' : 'Activar'}</button>
+        <button class="peligro btnBorrar">Eliminar</button>
+      </td></tr>`).join('') : '<tr><td colspan="6" class="ayuda">Aún no hay usuarios.</td></tr>';
+    for (const tr of document.querySelectorAll('#filasUsuarios tr[data-id]')) {
+      const u = lista.find((x) => x.id === Number(tr.dataset.id));
+      const accion = async (fn, ok) => { try { await fn(); msgU(ok); await cargarUsuarios(); } catch (e) { msgU(esc(e.message), 'err'); } };
+      const put = (cuerpo) => api(`/api/usuarios/${u.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+      tr.querySelector('.btnClave').onclick = () => {
+        const clave = prompt(`Nueva contraseña para «${u.usuario}» (mínimo 10 caracteres):`, claveAleatoria());
+        if (clave) accion(() => put({ clave }), `Contraseña de «${esc(u.usuario)}» actualizada. Entrégasela: <b>${esc(clave)}</b>`);
+      };
+      tr.querySelector('.btnActivo').onclick = () => accion(() => put({ activo: !u.activo }), `Usuario «${esc(u.usuario)}» ${u.activo ? 'desactivado' : 'activado'}.`);
+      tr.querySelector('.btnBorrar').onclick = () => {
+        if (confirm(`¿Eliminar el usuario «${u.usuario}»?`)) accion(() => api(`/api/usuarios/${u.id}`, { method: 'DELETE' }), 'Usuario eliminado.');
+      };
+      const sel = tr.querySelector('.selPerfilU');
+      if (sel) sel.onchange = () => accion(() => put({ perfilId: Number(sel.value) }), `«${esc(u.usuario)}» ahora usa el perfil «${esc(sel.selectedOptions[0].textContent)}».`);
+    }
+  } catch (e) { msgU(esc(e.message), 'err'); }
+}
+
+document.getElementById('btnGenerar').onclick = (ev) => { ev.preventDefault(); document.getElementById('nuClave').value = claveAleatoria(); };
+document.getElementById('nuRol').onchange = (ev) => { document.getElementById('cajaPerfil').hidden = ev.target.value === 'admin'; };
+document.getElementById('btnCrearUsuario').onclick = async () => {
+  const cuerpo = {
+    usuario: document.getElementById('nuUsuario').value, clave: document.getElementById('nuClave').value,
+    rol: document.getElementById('nuRol').value, perfilId: Number(document.getElementById('nuPerfil').value),
+  };
+  try {
+    const u = await api('/api/usuarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+    msgU(`Usuario «${esc(u.usuario)}» creado. Entrégale estos datos: usuario <b>${esc(u.usuario)}</b>, contraseña <b>${esc(cuerpo.clave)}</b>. La contraseña no se volverá a mostrar.`);
+    document.getElementById('nuUsuario').value = '';
+    document.getElementById('nuClave').value = '';
+    await cargarUsuarios();
+  } catch (e) { msgU(esc(e.message), 'err'); }
+};
+
+cargar().then(cargarUsuarios);
 </script>
 </body>
 </html>

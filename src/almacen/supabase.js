@@ -5,7 +5,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { DEFAULTS, conDefaults } = require('../config');
 const { llaveDesdeTexto, crearCifrador } = require('../cifrado');
-const { publico, resumenEnvio, fallo, resumirPrevios } = require('./comun');
+const { publico, resumenEnvio, fallo, resumirPrevios, usuarioPublico } = require('./comun');
 
 function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
   if (!secreto) throw new Error('Falta la variable APP_SECRETO (llave para cifrar la contraseña de Saphety).');
@@ -14,7 +14,8 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
 
   const revisar = ({ data, error }) => {
     if (error) {
-      if (error.code === '23505') throw fallo(400, 'Ya existe un perfil con ese nombre.');
+      if (error.code === '23505') throw fallo(400, /usuarios/.test(error.message) ? 'Ya existe un usuario con ese nombre.' : 'Ya existe un perfil con ese nombre.');
+      if (error.code === '23503') throw fallo(400, 'El perfil tiene usuarios asignados: elimínalos o asígnalos a otro perfil primero.');
       throw new Error(`Supabase: ${error.message}`);
     }
     return data;
@@ -89,10 +90,11 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
       }
       return resumirPrevios([...filas.values()], new Set(numerosExcel));
     },
-    listar: async ({ buscar = '', limite = 100 } = {}) => {
+    listar: async ({ buscar = '', limite = 100, perfilId = null } = {}) => {
       let q = db.from('envios')
         .select('id, creado_en, perfil_nombre, modo, estado, numero, numero_excel, proveedor, identificacion, valor, saphety_id, cuds, mensaje')
         .order('id', { ascending: false }).limit(limite);
+      if (perfilId != null) q = q.eq('perfil_id', Number(perfilId));
       const b = buscar.replace(/[^\p{L}\p{N} .-]/gu, '').trim();
       if (b) q = q.or(`numero.ilike.*${b}*,numero_excel.ilike.*${b}*,proveedor.ilike.*${b}*,identificacion.ilike.*${b}*`);
       return revisar(await q).map(aEnvio).map(resumenEnvio);
@@ -100,7 +102,30 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
     obtener: async (id) => aEnvio(revisar(await db.from('envios').select('*').eq('id', Number(id)).maybeSingle())),
   };
 
-  return { tipo: 'supabase', perfiles, envios };
+  const aUsuario = (f) => f && ({
+    id: f.id, usuario: f.usuario, claveHash: f.clave_hash, rol: f.rol, perfilId: f.perfil_id, activo: f.activo,
+    creadoEn: f.creado_en, ultimoIngreso: f.ultimo_ingreso,
+  });
+  const usuarios = {
+    listar: async () => revisar(await db.from('usuarios').select('*').order('usuario')).map(aUsuario).map(usuarioPublico),
+    obtener: async (id) => usuarioPublico(aUsuario(revisar(await db.from('usuarios').select('*').eq('id', Number(id)).maybeSingle()))),
+    /** Incluye claveHash: solo para el inicio de sesión. */
+    porNombre: async (usuario) => aUsuario(revisar(await db.from('usuarios').select('*').eq('usuario', usuario).maybeSingle())),
+    crear: async ({ usuario, claveHash, rol, perfilId }) => usuarioPublico(aUsuario(revisar(await db.from('usuarios')
+      .insert({ usuario, clave_hash: claveHash, rol, perfil_id: perfilId ?? null }).select('*').single()))),
+    actualizar: async (id, c) => {
+      const cambios = {};
+      if ('claveHash' in c) cambios.clave_hash = c.claveHash;
+      if ('rol' in c) cambios.rol = c.rol;
+      if ('perfilId' in c) cambios.perfil_id = c.perfilId;
+      if ('activo' in c) cambios.activo = c.activo;
+      if ('ultimoIngreso' in c) cambios.ultimo_ingreso = c.ultimoIngreso;
+      return usuarioPublico(aUsuario(revisar(await db.from('usuarios').update(cambios).eq('id', Number(id)).select('*').single())));
+    },
+    eliminar: async (id) => { revisar(await db.from('usuarios').delete().eq('id', Number(id))); },
+  };
+
+  return { tipo: 'supabase', perfiles, envios, usuarios };
 }
 
 module.exports = { crearAlmacenSupabase };

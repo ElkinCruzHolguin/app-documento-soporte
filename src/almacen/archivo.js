@@ -5,12 +5,13 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { DEFAULTS, conDefaults } = require('../config');
 const { llaveDesdeTexto, crearCifrador } = require('../cifrado');
-const { publico, resumenEnvio, fallo, resumirPrevios } = require('./comun');
+const { publico, resumenEnvio, fallo, resumirPrevios, usuarioPublico } = require('./comun');
 
 function crearAlmacenArchivo(dir) {
   fs.mkdirSync(dir, { recursive: true });
   const ARCHIVO = path.join(dir, 'parametros.json');
   const ARCHIVO_ENVIOS = path.join(dir, 'envios.json');
+  const ARCHIVO_USUARIOS = path.join(dir, 'usuarios.json');
 
   function llave() {
     if (process.env.APP_SECRETO) return llaveDesdeTexto(process.env.APP_SECRETO);
@@ -30,6 +31,7 @@ function crearAlmacenArchivo(dir) {
     return JSON.parse(fs.readFileSync(ARCHIVO, 'utf8'));
   }
   const escribir = (d) => guardarJson(ARCHIVO, d);
+  const leerUsuarios = () => (fs.existsSync(ARCHIVO_USUARIOS) ? JSON.parse(fs.readFileSync(ARCHIVO_USUARIOS, 'utf8')) : []);
   const leerEnvios = () => (fs.existsSync(ARCHIVO_ENVIOS) ? JSON.parse(fs.readFileSync(ARCHIVO_ENVIOS, 'utf8')) : []);
 
   const perfiles = {
@@ -64,6 +66,7 @@ function crearAlmacenArchivo(dir) {
       escribir(d);
     },
     eliminar: async (id) => {
+      if (leerUsuarios().some((u) => u.perfilId === Number(id))) throw fallo(400, 'El perfil tiene usuarios asignados: elimínalos o asígnalos a otro perfil primero.');
       const d = leer();
       d.perfiles = d.perfiles.filter((p) => p.id !== Number(id));
       escribir(d);
@@ -93,9 +96,10 @@ function crearAlmacenArchivo(dir) {
       const buscados = new Set(numerosExcel);
       return resumirPrevios(leerEnvios().filter((e) => e.modo === 'real' && e.nitAdquiriente === nit), buscados);
     },
-    listar: async ({ buscar = '', limite = 100 } = {}) => {
+    listar: async ({ buscar = '', limite = 100, perfilId = null } = {}) => {
       const q = buscar.toUpperCase();
       return leerEnvios()
+        .filter((e) => perfilId == null || e.perfilId === Number(perfilId))
         .filter((e) => !q || [e.numero, e.numeroExcel, e.proveedor, e.identificacion].some((v) => String(v || '').toUpperCase().includes(q)))
         .sort((a, b) => b.id - a.id)
         .slice(0, limite)
@@ -104,7 +108,31 @@ function crearAlmacenArchivo(dir) {
     obtener: async (id) => leerEnvios().find((e) => e.id === Number(id)) || null,
   };
 
-  return { tipo: 'archivo', perfiles, envios };
+  const usuarios = {
+    listar: async () => leerUsuarios().map(usuarioPublico).sort((a, b) => a.usuario.localeCompare(b.usuario)),
+    obtener: async (id) => usuarioPublico(leerUsuarios().find((u) => u.id === Number(id))),
+    /** Incluye claveHash: solo para el inicio de sesión. */
+    porNombre: async (usuario) => leerUsuarios().find((u) => u.usuario === usuario) || null,
+    crear: async ({ usuario, claveHash, rol, perfilId }) => {
+      const lista = leerUsuarios();
+      if (lista.some((u) => u.usuario === usuario)) throw fallo(400, 'Ya existe un usuario con ese nombre.');
+      const u = { id: lista.reduce((m, x) => Math.max(m, x.id), 0) + 1, usuario, claveHash, rol, perfilId: perfilId ?? null, activo: true, creadoEn: new Date().toISOString() };
+      lista.push(u);
+      guardarJson(ARCHIVO_USUARIOS, lista);
+      return usuarioPublico(u);
+    },
+    actualizar: async (id, cambios) => {
+      const lista = leerUsuarios();
+      const u = lista.find((x) => x.id === Number(id));
+      if (!u) throw fallo(404, 'Usuario no encontrado.');
+      Object.assign(u, cambios);
+      guardarJson(ARCHIVO_USUARIOS, lista);
+      return usuarioPublico(u);
+    },
+    eliminar: async (id) => guardarJson(ARCHIVO_USUARIOS, leerUsuarios().filter((u) => u.id !== Number(id))),
+  };
+
+  return { tipo: 'archivo', perfiles, envios, usuarios };
 }
 
 module.exports = { crearAlmacenArchivo };

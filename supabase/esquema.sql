@@ -38,9 +38,25 @@ create index if not exists envios_creado_en on public.envios (creado_en desc);
 create index if not exists envios_numero_excel on public.envios (nit_adquiriente, numero_excel) where modo = 'real';
 create index if not exists envios_aceptados on public.envios (nit_adquiriente, numero) where modo = 'real' and estado = 'aceptado';
 
+-- Usuarios de la app. El super administrador no está aquí: es APP_USUARIO/APP_CLAVE (variables de entorno).
+-- rol 'empresa' = usuario de una compañía, limitado a su perfil; rol 'admin' = ve y administra todo.
+create table if not exists public.usuarios (
+  id bigint generated always as identity primary key,
+  usuario text not null unique,
+  clave_hash text not null, -- scrypt con sal; la contraseña no se puede recuperar
+  rol text not null check (rol in ('admin', 'empresa')),
+  perfil_id bigint references public.perfiles (id) on delete restrict,
+  activo boolean not null default true,
+  creado_en timestamptz not null default now(),
+  ultimo_ingreso timestamptz,
+  check (rol = 'admin' or perfil_id is not null)
+);
+create index if not exists envios_perfil on public.envios (perfil_id, id desc);
+
 alter table public.perfiles enable row level security;
 alter table public.envios enable row level security;
-revoke all on public.perfiles, public.envios from anon, authenticated;
+alter table public.usuarios enable row level security;
+revoke all on public.perfiles, public.envios, public.usuarios from anon, authenticated;
 
 -- Deja un solo perfil activo (en una transacción).
 create or replace function public.activar_perfil(p_id bigint) returns void
@@ -66,4 +82,4 @@ end $$;
 
 revoke execute on function public.activar_perfil(bigint), public.tomar_consecutivo(bigint, bigint) from public, anon, authenticated;
 grant execute on function public.activar_perfil(bigint), public.tomar_consecutivo(bigint, bigint) to service_role;
-grant all on public.perfiles, public.envios to service_role;
+grant all on public.perfiles, public.envios, public.usuarios to service_role;

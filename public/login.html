@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iniciar sesión</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  .login { max-width: 360px; margin: 12vh auto 0; }
+  .login h1 { font-size: 18px; margin: 0 0 4px; }
+  .login form > div { margin-top: 12px; }
+  .login button { width: 100%; margin-top: 16px; padding: 9px; }
+</style>
+</head>
+<body>
+<main>
+  <section class="panel login">
+    <h1>Documentos soporte · Saphety</h1>
+    <p class="ayuda">Ingresa con el usuario y la contraseña de tu compañía.</p>
+    <div id="msg"></div>
+    <form id="form">
+      <div><label for="usuario">Usuario</label><input id="usuario" name="usuario" autocomplete="username" required autofocus></div>
+      <div><label for="clave">Contraseña</label><input id="clave" name="clave" type="password" autocomplete="current-password" required></div>
+      <button type="submit" id="btn">Ingresar</button>
+    </form>
+  </section>
+</main>
+<script>
+const form = document.getElementById('form');
+form.onsubmit = async (ev) => {
+  ev.preventDefault();
+  const btn = document.getElementById('btn');
+  const msg = document.getElementById('msg');
+  btn.disabled = true;
+  msg.innerHTML = '';
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario: form.usuario.value, clave: form.clave.value }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    location.href = 'index.html';
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err"></div>`;
+    msg.firstChild.textContent = e.message;
+    form.clave.value = '';
+    form.clave.focus();
+  } finally {
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
