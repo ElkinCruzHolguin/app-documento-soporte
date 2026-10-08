@@ -3,6 +3,7 @@
 // (POST /v2/{opv}/outbounddocuments/supportDocument) y valida la fila.
 
 const { conDefaults } = require('./config');
+const { CAPITALES } = require('./capitales');
 
 const PRIMOS_DV = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
 
@@ -143,12 +144,20 @@ function construirDocumento(datos, configuracion, opciones = {}) {
     Object.assign(address, { DepartmentCode: dep, CityCode: ciudad });
     if (postal) address.PostalCode = postal;
   } else {
-    // Orden: columnas del Excel -> tabla por proveedor -> tabla por país -> valor por defecto.
+    // Orden: columnas del Excel -> tabla por proveedor -> tabla por país -> capital del país -> valor por defecto.
     const tabla = cfg.ubicacionesExtranjeros || {};
     const porProveedor = tabla[identificacion] || {};
     const porPais = tabla[pais] || {};
-    const ciudad = texto(d.municipio) || texto(porProveedor.ciudad) || texto(porPais.ciudad) || cfg.ciudadExtranjeroDefecto;
-    const dep = texto(d.departamento) || texto(porProveedor.departamento) || texto(porPais.departamento) || cfg.departamentoExtranjeroDefecto;
+    const capital = CAPITALES[pais] || {};
+    let ciudad = texto(d.municipio) || texto(porProveedor.ciudad) || texto(porPais.ciudad);
+    let dep = texto(d.departamento) || texto(porProveedor.departamento) || texto(porPais.departamento);
+    if ((!ciudad || !dep) && capital.ciudad) {
+      ciudad = ciudad || capital.ciudad;
+      dep = dep || capital.departamento;
+      advertencias.push(`Proveedor no residente ${identificacion}: se usó la capital del país (${ciudad}, ${dep}) porque no hay ciudad registrada.`);
+    }
+    ciudad = ciudad || cfg.ciudadExtranjeroDefecto;
+    dep = dep || cfg.departamentoExtranjeroDefecto;
     if (!ciudad || !dep) {
       errores.push(`Proveedor no residente ${identificacion}: falta ciudad o departamento/estado. Agrégalo en Administración › Ubicación de proveedores extranjeros.`);
     }

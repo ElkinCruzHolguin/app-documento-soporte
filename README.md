@@ -45,7 +45,7 @@ Protecciones: números repetidos dentro del mismo archivo se marcan como error; 
 | TIPO PERSONA (1/2) | `LegalType` Legal / Natural |
 | PROVEEDOR; NOMBRE, SEGUNDO NOMBRE, APELLIDOS | `Name`; `Person` (persona natural) |
 | OBLIGACIONES FISCALES / OBLIGACIONES IMPUESTO | `ResponsabilityTypes` / `TaxScheme` |
-| DIRECCION, DEPARTAMENTO, MUNICIPIO, CODIGO POSTAL | `Address`: códigos DIAN con ceros a la izquierda para residentes. Para no residentes, `CityName`/`DepartmentName` salen de la tabla «Ubicación de proveedores extranjeros» de Administración (por identificación del proveedor o, si no está, por país) |
+| DIRECCION, DEPARTAMENTO, MUNICIPIO, CODIGO POSTAL | `Address`: códigos DIAN con ceros a la izquierda para residentes. Para no residentes, `CityName`/`DepartmentName` salen de la tabla «Ubicación de proveedores extranjeros» de Administración (por identificación del proveedor o, si no está, por país); si tampoco está, la capital del país (`src/capitales.js`) con un aviso |
 | TELEFONO (si no es 0) | `Telephone` |
 | VALOR_TOTAL ITEM | `UnitPrice`, `GrossAmount`, `NetAmount` y totales (IVA 0 %) |
 | IDENTIFICACION PRODUCTO / DESCRIPCION | `Item.Gtin` / `Item.Description` |

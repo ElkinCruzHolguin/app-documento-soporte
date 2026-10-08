@@ -63,11 +63,24 @@ test('proveedor no residente: ciudad por tabla de proveedor, por país o error',
   assert.strictEqual(porProveedor.json.SupplierParty.Address.CityName, 'Monterrey');
   assert.strictEqual(porProveedor.json.SupplierParty.Address.DepartmentName, 'Nuevo León');
 
+  // Proveedor nuevo: capital del país, con advertencia (no bloquea el envío)
   const nuevo = { ...ext, identificacion: 'NUEVO123' };
-  assert.ok(construirDocumento(nuevo, CFG).errores.some((e) => e.includes('falta ciudad')));
-  const porPais = construirDocumento(nuevo, { ...CFG, ubicacionesExtranjeros: { MX: { ciudad: 'Ciudad de México', departamento: 'Ciudad de México' } } });
+  const porCapital = construirDocumento(nuevo, CFG);
+  assert.deepStrictEqual(porCapital.errores, []);
+  assert.strictEqual(porCapital.json.SupplierParty.Address.CityName, 'Ciudad de México');
+  assert.strictEqual(porCapital.json.SupplierParty.Address.DepartmentName, 'Ciudad de México');
+  assert.ok(porCapital.advertencias.some((a) => a.includes('capital del país')));
+  const panama = construirDocumento({ ...nuevo, pais: 'PA' }, CFG);
+  assert.strictEqual(panama.json.SupplierParty.Address.CityName, 'Ciudad de Panamá');
+
+  // La tabla de Administración por país tiene prioridad sobre la capital
+  const porPais = construirDocumento(nuevo, { ...CFG, ubicacionesExtranjeros: { MX: { ciudad: 'Monterrey', departamento: 'Nuevo León' } } });
   assert.deepStrictEqual(porPais.errores, []);
-  assert.strictEqual(porPais.json.SupplierParty.Address.CityName, 'Ciudad de México');
+  assert.strictEqual(porPais.json.SupplierParty.Address.CityName, 'Monterrey');
+  assert.ok(!porPais.advertencias.some((a) => a.includes('capital del país')));
+
+  // País sin capital conocida ni valor por defecto: error
+  assert.ok(construirDocumento({ ...nuevo, pais: 'ZZ' }, CFG).errores.some((e) => e.includes('falta ciudad')));
 });
 
 test('validaciones de configuración', () => {

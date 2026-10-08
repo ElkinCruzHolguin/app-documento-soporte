@@ -1,0 +1,65 @@
+'use strict';
+// Ciudad de respaldo para proveedores no residentes: la capital del país (código PAIS ISO de 2 letras).
+// Se usa solo cuando el Excel no trae la ciudad y el proveedor/país no está en la tabla de Administración.
+const CAPITALES = {
+  // Norteamérica y Centroamérica
+  MX: { ciudad: 'Ciudad de México', departamento: 'Ciudad de México' },
+  US: { ciudad: 'Washington', departamento: 'District of Columbia' },
+  CA: { ciudad: 'Ottawa', departamento: 'Ontario' },
+  PA: { ciudad: 'Ciudad de Panamá', departamento: 'Panamá' },
+  CR: { ciudad: 'San José', departamento: 'San José' },
+  GT: { ciudad: 'Ciudad de Guatemala', departamento: 'Guatemala' },
+  SV: { ciudad: 'San Salvador', departamento: 'San Salvador' },
+  HN: { ciudad: 'Tegucigalpa', departamento: 'Francisco Morazán' },
+  NI: { ciudad: 'Managua', departamento: 'Managua' },
+  BZ: { ciudad: 'Belmopán', departamento: 'Cayo' },
+  // Caribe
+  DO: { ciudad: 'Santo Domingo', departamento: 'Distrito Nacional' },
+  PR: { ciudad: 'San Juan', departamento: 'San Juan' },
+  CU: { ciudad: 'La Habana', departamento: 'La Habana' },
+  JM: { ciudad: 'Kingston', departamento: 'Kingston' },
+  CW: { ciudad: 'Willemstad', departamento: 'Curazao' },
+  AW: { ciudad: 'Oranjestad', departamento: 'Aruba' },
+  // Suramérica
+  VE: { ciudad: 'Caracas', departamento: 'Distrito Capital' },
+  EC: { ciudad: 'Quito', departamento: 'Pichincha' },
+  PE: { ciudad: 'Lima', departamento: 'Lima' },
+  BR: { ciudad: 'Brasília', departamento: 'Distrito Federal' },
+  BO: { ciudad: 'Sucre', departamento: 'Chuquisaca' },
+  CL: { ciudad: 'Santiago', departamento: 'Región Metropolitana' },
+  AR: { ciudad: 'Buenos Aires', departamento: 'Ciudad Autónoma de Buenos Aires' },
+  UY: { ciudad: 'Montevideo', departamento: 'Montevideo' },
+  PY: { ciudad: 'Asunción', departamento: 'Distrito Capital' },
+  // Europa
+  ES: { ciudad: 'Madrid', departamento: 'Madrid' },
+  PT: { ciudad: 'Lisboa', departamento: 'Lisboa' },
+  FR: { ciudad: 'París', departamento: 'Île-de-France' },
+  DE: { ciudad: 'Berlín', departamento: 'Berlín' },
+  IT: { ciudad: 'Roma', departamento: 'Lacio' },
+  GB: { ciudad: 'Londres', departamento: 'Inglaterra' },
+  IE: { ciudad: 'Dublín', departamento: 'Leinster' },
+  NL: { ciudad: 'Ámsterdam', departamento: 'Holanda Septentrional' },
+  BE: { ciudad: 'Bruselas', departamento: 'Bruselas-Capital' },
+  CH: { ciudad: 'Berna', departamento: 'Berna' },
+  AT: { ciudad: 'Viena', departamento: 'Viena' },
+  SE: { ciudad: 'Estocolmo', departamento: 'Estocolmo' },
+  DK: { ciudad: 'Copenhague', departamento: 'Capital' },
+  NO: { ciudad: 'Oslo', departamento: 'Oslo' },
+  FI: { ciudad: 'Helsinki', departamento: 'Uusimaa' },
+  PL: { ciudad: 'Varsovia', departamento: 'Mazovia' },
+  LU: { ciudad: 'Luxemburgo', departamento: 'Luxemburgo' },
+  // Asia y Oceanía
+  CN: { ciudad: 'Pekín', departamento: 'Pekín' },
+  JP: { ciudad: 'Tokio', departamento: 'Tokio' },
+  KR: { ciudad: 'Seúl', departamento: 'Seúl' },
+  IN: { ciudad: 'Nueva Delhi', departamento: 'Delhi' },
+  SG: { ciudad: 'Singapur', departamento: 'Singapur' },
+  HK: { ciudad: 'Hong Kong', departamento: 'Hong Kong' },
+  TW: { ciudad: 'Taipéi', departamento: 'Taipéi' },
+  IL: { ciudad: 'Jerusalén', departamento: 'Jerusalén' },
+  AE: { ciudad: 'Abu Dabi', departamento: 'Abu Dabi' },
+  AU: { ciudad: 'Canberra', departamento: 'Territorio de la Capital Australiana' },
+  NZ: { ciudad: 'Wellington', departamento: 'Wellington' },
+};
+
+module.exports = { CAPITALES };
