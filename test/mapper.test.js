@@ -76,6 +76,11 @@ test('proveedor no residente: ciudad del Excel, capital del país o error', () =
   assert.strictEqual(conCiudad.json.SupplierParty.Address.CityName, 'Monterrey');
   assert.ok(!conCiudad.advertencias.some((a) => a.includes('capital del país')));
 
+  // Lista completa de países, todos con ciudad y departamento
+  const { CAPITALES } = require('../src/capitales');
+  assert.ok(Object.keys(CAPITALES).length >= 240);
+  for (const [codigo, u] of Object.entries(CAPITALES)) assert.ok(/^[A-Z]{2}$/.test(codigo) && u.ciudad && u.departamento, codigo);
+
   // País sin capital conocida ni valor por defecto: error
   assert.ok(construirDocumento({ ...nuevo, pais: 'ZZ' }, CFG).errores.some((e) => e.includes('falta ciudad')));
 });
