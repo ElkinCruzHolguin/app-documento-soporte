@@ -158,7 +158,7 @@ document.getElementById('btnEnviar').onclick = async () => {
   const { perfil } = await api('/api/estado');
   let confirmado = false;
   if (perfil.modoEnvio === 'real') {
-    confirmado = confirm(`Se enviarán ${lista.length} documentos REALES a ${perfil.url} con el perfil «${perfil.nombre}». ¿Continuar?`);
+    confirmado = confirm(`Se enviarán ${lista.length} documentos REALES a ${perfil.url} de la compañía «${perfil.nombre}». ¿Continuar?`);
     if (!confirmado) return;
   }
   msg.innerHTML = '';

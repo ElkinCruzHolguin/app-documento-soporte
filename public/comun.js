@@ -37,12 +37,12 @@ async function pintarBanner() {
     // Administración solo para el administrador (el servidor también lo impide).
     document.querySelectorAll('[data-solo-admin]').forEach((a) => { a.hidden = !esAdmin; });
     if (document.body.dataset.soloAdmin !== undefined && !esAdmin) { location.href = 'index.html'; return; }
-    const modo = !perfil ? '<span class="chip con_errores">Sin perfil</span>'
+    const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>'
       : perfil.modoEnvio === 'real' ? '<span class="chip real">ENVÍO REAL</span>' : '<span class="chip simulado">Modo simulado</span>';
     const quien = usuario.login
       ? ` · <b>${esc(usuario.usuario)}</b>${esAdmin ? ' (admin)' : ''} · <a href="#" id="btnSalir">Salir</a>`
       : '';
-    el.innerHTML = `${perfil ? `Perfil <b>${esc(perfil.nombre)}</b> · ` : ''}${modo}${quien}`;
+    el.innerHTML = `${perfil ? `Compañía <b>${esc(perfil.nombre)}</b> · ` : ''}${modo}${quien}`;
     const btn = document.getElementById('btnSalir');
     if (btn) btn.onclick = (ev) => { ev.preventDefault(); salir(); };
   } catch (e) {

@@ -53,7 +53,7 @@ const mensajeYaAceptado = (numeroExcel, aceptadoComo) =>
 const perfilDe = (req) => (req.usuario.rol === 'admin' ? perfiles.activo() : perfiles.obtener(req.usuario.perfilId));
 async function perfilActivo(req) {
   const p = await perfilDe(req);
-  if (!p) throw fallo(400, req.usuario.rol === 'admin' ? 'No hay un perfil activo. Crea o activa uno en Administración.' : 'Tu usuario no tiene un perfil asignado. Contacta al administrador.');
+  if (!p) throw fallo(400, req.usuario.rol === 'admin' ? 'No hay una compañía activa. Crea o elige una en Administración.' : 'Tu usuario no tiene una compañía asignada. Contacta al administrador.');
   return p;
 }
 
@@ -131,28 +131,28 @@ app.get('/api/perfiles', envolver(async (req, res) => res.json(await perfiles.li
 
 app.post('/api/perfiles', envolver(async (req, res) => {
   const { nombre, config, clave } = req.body || {};
-  if (!nombre || !String(nombre).trim()) throw fallo(400, 'El perfil necesita un nombre.');
+  if (!nombre || !String(nombre).trim()) throw fallo(400, 'La compañía necesita un nombre.');
   res.json(await perfiles.crear(String(nombre).trim(), limpiarConfig(config), clave));
 }));
 
 app.put('/api/perfiles/:id', envolver(async (req, res) => {
   const actual = await perfiles.obtener(req.params.id);
-  if (!actual) throw fallo(404, 'Perfil no encontrado.');
+  if (!actual) throw fallo(404, 'Compañía no encontrada.');
   const { nombre, config, clave } = req.body || {};
   saphety.olvidarToken(actual.id);
   res.json(await perfiles.actualizar(actual.id, String(nombre || actual.nombre).trim(), { ...actual.config, ...limpiarConfig(config) }, clave));
 }));
 
 app.post('/api/perfiles/:id/activar', envolver(async (req, res) => {
-  if (!(await perfiles.obtener(req.params.id))) throw fallo(404, 'Perfil no encontrado.');
+  if (!(await perfiles.obtener(req.params.id))) throw fallo(404, 'Compañía no encontrada.');
   await perfiles.activar(req.params.id);
   res.json({ ok: true });
 }));
 
 app.delete('/api/perfiles/:id', envolver(async (req, res) => {
   const p = await perfiles.obtener(req.params.id);
-  if (!p) throw fallo(404, 'Perfil no encontrado.');
-  if (p.activo) throw fallo(400, 'No se puede eliminar el perfil activo.');
+  if (!p) throw fallo(404, 'Compañía no encontrada.');
+  if (p.activo) throw fallo(400, 'No se puede eliminar la compañía con la que estás trabajando.');
   await perfiles.eliminar(p.id);
   res.json({ ok: true });
 }));
@@ -160,14 +160,14 @@ app.delete('/api/perfiles/:id', envolver(async (req, res) => {
 // Solo pide el token: sirve para comprobar usuario, contraseña y opv.
 app.post('/api/perfiles/:id/probar', envolver(async (req, res) => {
   const p = await perfiles.obtener(req.params.id);
-  if (!p) throw fallo(404, 'Perfil no encontrado.');
+  if (!p) throw fallo(404, 'Compañía no encontrada.');
   await saphety.obtenerToken(p.id, p.config, await perfiles.clave(p.id), { forzar: true });
   res.json({ ok: true, mensaje: 'Token obtenido correctamente.' });
 }));
 
 app.get('/api/perfiles/:id/catalogo/:nombre', envolver(async (req, res) => {
   const p = await perfiles.obtener(req.params.id);
-  if (!p) throw fallo(404, 'Perfil no encontrado.');
+  if (!p) throw fallo(404, 'Compañía no encontrada.');
   if (!/^[a-z]+$/i.test(req.params.nombre)) throw fallo(400, 'Nombre de catálogo inválido.');
   res.json(await saphety.catalogo(p.id, p.config, await perfiles.clave(p.id), req.params.nombre));
 }));
@@ -278,7 +278,7 @@ app.get('/api/estado', envolver(async (req, res) => {
 const ROLES = ['admin', 'empresa'];
 async function validarUsuario({ rol, perfilId }) {
   if (!ROLES.includes(rol)) throw fallo(400, 'Rol inválido.');
-  if (rol === 'empresa' && !(await perfiles.obtener(perfilId))) throw fallo(400, 'Elige el perfil (compañía) del usuario.');
+  if (rol === 'empresa' && !(await perfiles.obtener(perfilId))) throw fallo(400, 'Elige la compañía del usuario.');
 }
 function validarClave(clave) {
   if (String(clave || '').length < 10) throw fallo(400, 'La contraseña debe tener al menos 10 caracteres.');

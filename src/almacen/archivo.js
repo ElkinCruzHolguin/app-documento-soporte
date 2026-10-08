@@ -44,7 +44,7 @@ function crearAlmacenArchivo(dir) {
     },
     crear: async (nombre, config, clave) => {
       const d = leer();
-      if (d.perfiles.some((p) => p.nombre === nombre)) throw fallo(400, 'Ya existe un perfil con ese nombre.');
+      if (d.perfiles.some((p) => p.nombre === nombre)) throw fallo(400, 'Ya existe una compañía con ese nombre.');
       const p = { id: d.siguienteId++, nombre, activo: d.perfiles.length === 0, config: conDefaults(config), claveCifrada: clave ? cifrar(clave) : null };
       d.perfiles.push(p);
       escribir(d);
@@ -53,7 +53,7 @@ function crearAlmacenArchivo(dir) {
     actualizar: async (id, nombre, config, clave) => {
       const d = leer();
       const p = d.perfiles.find((x) => x.id === Number(id));
-      if (d.perfiles.some((x) => x.nombre === nombre && x.id !== p.id)) throw fallo(400, 'Ya existe un perfil con ese nombre.');
+      if (d.perfiles.some((x) => x.nombre === nombre && x.id !== p.id)) throw fallo(400, 'Ya existe una compañía con ese nombre.');
       p.nombre = nombre;
       p.config = conDefaults(config);
       if (clave) p.claveCifrada = cifrar(clave);
@@ -66,7 +66,7 @@ function crearAlmacenArchivo(dir) {
       escribir(d);
     },
     eliminar: async (id) => {
-      if (leerUsuarios().some((u) => u.perfilId === Number(id))) throw fallo(400, 'El perfil tiene usuarios asignados: elimínalos o asígnalos a otro perfil primero.');
+      if (leerUsuarios().some((u) => u.perfilId === Number(id))) throw fallo(400, 'La compañía tiene usuarios asignados: elimínalos o asígnalos a otra compañía primero.');
       const d = leer();
       d.perfiles = d.perfiles.filter((p) => p.id !== Number(id));
       escribir(d);

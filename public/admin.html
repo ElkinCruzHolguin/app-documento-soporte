@@ -16,12 +16,12 @@
 <main>
   <section class="panel">
     <div class="fila-botones" style="margin:0">
-      <div style="min-width:260px"><label for="selPerfil">Perfil (ambiente)</label><select id="selPerfil"></select></div>
-      <button class="secundario" id="btnNuevo" style="align-self:end">Nuevo perfil</button>
-      <button class="secundario" id="btnActivar" style="align-self:end">Usar este perfil</button>
+      <div style="min-width:260px"><label for="selPerfil">Compañía</label><select id="selPerfil"></select></div>
+      <button class="secundario" id="btnNuevo" style="align-self:end">Nueva compañía</button>
+      <button class="secundario" id="btnActivar" style="align-self:end">Trabajar con esta compañía</button>
       <button class="peligro" id="btnEliminar" style="align-self:end">Eliminar</button>
     </div>
-    <p class="ayuda">Un perfil agrupa usuario, contraseña y parámetros de un ambiente o empresa (por ejemplo «Vitro QA» o «Atica QA»). Las cargas usan el perfil activo.</p>
+    <p class="ayuda">Cada compañía tiene su propia conexión con Saphety (usuario, contraseña, opv, companyId), su NIT y serie, sus parámetros, sus usuarios (sección Usuarios, abajo) y su historial de envíos. Tú, como administrador, cargas y envías con la compañía con la que estés trabajando; cada usuario de compañía, siempre con la suya.</p>
   </section>
 
   <div id="msg"></div>
@@ -30,7 +30,7 @@
     <section class="panel">
       <h2>Conexión con Saphety</h2>
       <div class="rejilla">
-        <div><label>Nombre del perfil</label><input name="nombre" required></div>
+        <div><label>Nombre de la compañía</label><input name="nombre" required></div>
         <div><label>URL de la API</label><input name="url" placeholder="https://api-factura-electronica-co-qa.saphety.com"></div>
         <div><label>Usuario (correo)</label><input name="usuario" type="email" autocomplete="off"></div>
         <div><label>Contraseña</label><input name="clave" type="password" autocomplete="new-password"><div class="ayuda" id="ayudaClave"></div></div>
@@ -110,11 +110,11 @@
 
   <section class="panel" id="panelUsuarios">
     <h2>Usuarios</h2>
-    <p class="ayuda">Un usuario de compañía solo trabaja con su perfil: carga y envía con él y solo ve su historial. No puede entrar a Administración ni cambiar parámetros. Un usuario administrador ve todo, igual que tú.</p>
+    <p class="ayuda">Un usuario de compañía solo trabaja con su compañía: carga y envía con ella y solo ve su historial. No puede entrar a Administración ni cambiar parámetros. Un usuario administrador ve todo, igual que tú.</p>
     <div id="msgUsuarios"></div>
     <div class="tabla-scroll">
       <table>
-        <thead><tr><th>Usuario</th><th>Rol</th><th>Perfil (compañía)</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead>
+        <thead><tr><th>Usuario</th><th>Rol</th><th>Compañía</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead>
         <tbody id="filasUsuarios"></tbody>
       </table>
     </div>
@@ -124,7 +124,7 @@
       <div><label for="nuClave">Contraseña (mínimo 10 caracteres)</label><input id="nuClave" autocomplete="new-password">
         <div class="ayuda"><a href="#" id="btnGenerar">Generar una segura</a> · cópiala y entrégala a la compañía: después no se puede ver.</div></div>
       <div><label for="nuRol">Rol</label><select id="nuRol"><option value="empresa">Compañía</option><option value="admin">Administrador</option></select></div>
-      <div id="cajaPerfil"><label for="nuPerfil">Perfil (compañía)</label><select id="nuPerfil"></select></div>
+      <div id="cajaPerfil"><label for="nuPerfil">Compañía</label><select id="nuPerfil"></select></div>
     </div>
     <div class="fila-botones"><button type="button" id="btnCrearUsuario">Crear usuario</button></div>
   </section>
@@ -182,26 +182,26 @@ form.onsubmit = async (ev) => {
 document.getElementById('selPerfil').onchange = (ev) => { msg(''); mostrar(perfiles.find((p) => p.id === Number(ev.target.value))); };
 
 document.getElementById('btnNuevo').onclick = async () => {
-  const nombre = prompt('Nombre del nuevo perfil (por ejemplo «Vitro QA»):');
+  const nombre = prompt('Nombre de la nueva compañía (por ejemplo «Vitro QA»):');
   if (!nombre) return;
   try {
     const p = await api('/api/perfiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre, config: {} }) });
-    msg('Perfil creado. Completa los datos y guarda.');
+    msg('Compañía creada. Completa su conexión y parámetros y pulsa Guardar. Luego crea sus usuarios en la sección Usuarios.');
     await cargar(p.id);
   } catch (e) { msg(esc(e.message), 'err'); }
 };
 
 document.getElementById('btnActivar').onclick = async () => {
   await api(`/api/perfiles/${actual.id}/activar`, { method: 'POST' });
-  msg(`Ahora se usa el perfil «${esc(actual.nombre)}».`);
+  msg(`Ahora trabajas con la compañía «${esc(actual.nombre)}».`);
   await cargar(actual.id);
 };
 
 document.getElementById('btnEliminar').onclick = async () => {
-  if (!confirm(`¿Eliminar el perfil «${actual.nombre}»?`)) return;
+  if (!confirm(`¿Eliminar la compañía «${actual.nombre}»?`)) return;
   try {
     await api(`/api/perfiles/${actual.id}`, { method: 'DELETE' });
-    msg('Perfil eliminado.');
+    msg('Compañía eliminada.');
     await cargar();
   } catch (e) { msg(esc(e.message), 'err'); }
 };
@@ -262,7 +262,7 @@ async function cargarUsuarios() {
         if (confirm(`¿Eliminar el usuario «${u.usuario}»?`)) accion(() => api(`/api/usuarios/${u.id}`, { method: 'DELETE' }), 'Usuario eliminado.');
       };
       const sel = tr.querySelector('.selPerfilU');
-      if (sel) sel.onchange = () => accion(() => put({ perfilId: Number(sel.value) }), `«${esc(u.usuario)}» ahora usa el perfil «${esc(sel.selectedOptions[0].textContent)}».`);
+      if (sel) sel.onchange = () => accion(() => put({ perfilId: Number(sel.value) }), `«${esc(u.usuario)}» ahora pertenece a la compañía «${esc(sel.selectedOptions[0].textContent)}».`);
     }
   } catch (e) { msgU(esc(e.message), 'err'); }
 }

@@ -14,8 +14,8 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
 
   const revisar = ({ data, error }) => {
     if (error) {
-      if (error.code === '23505') throw fallo(400, /usuarios/.test(error.message) ? 'Ya existe un usuario con ese nombre.' : 'Ya existe un perfil con ese nombre.');
-      if (error.code === '23503') throw fallo(400, 'El perfil tiene usuarios asignados: elimínalos o asígnalos a otro perfil primero.');
+      if (error.code === '23505') throw fallo(400, /usuarios/.test(error.message) ? 'Ya existe un usuario con ese nombre.' : 'Ya existe una compañía con ese nombre.');
+      if (error.code === '23503') throw fallo(400, 'La compañía tiene usuarios asignados: elimínalos o asígnalos a otra compañía primero.');
       throw new Error(`Supabase: ${error.message}`);
     }
     return data;
