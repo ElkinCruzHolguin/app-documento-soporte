@@ -53,7 +53,7 @@ Protecciones: números repetidos dentro del mismo archivo se marcan como error; 
 | TIPO PERSONA (1/2) | `LegalType` Legal / Natural |
 | PROVEEDOR; NOMBRE, SEGUNDO NOMBRE, APELLIDOS | `Name`; `Person` (persona natural) |
 | OBLIGACIONES FISCALES / OBLIGACIONES IMPUESTO | `ResponsabilityTypes` / `TaxScheme` |
-| DIRECCION, DEPARTAMENTO, MUNICIPIO, CODIGO POSTAL | `Address`: códigos DIAN con ceros a la izquierda para residentes. Para no residentes, `CityName`/`DepartmentName` salen de MUNICIPIO/DEPARTAMENTO si el Excel los trae; si no, la capital del país según PAIS (`src/capitales.js`, todos los países ISO) con un aviso |
+| DIRECCION, DEPARTAMENTO, MUNICIPIO, CODIGO POSTAL | `Address`: códigos DIAN con ceros a la izquierda para residentes. Para no residentes, `CityName`/`DepartmentName` salen de MUNICIPIO/DEPARTAMENTO si el Excel los trae; si no, la capital del país según PAIS (`src/dominio/capitales.js`, todos los países ISO) con un aviso |
 | TELEFONO (si no es 0) | `Telephone` |
 | VALOR_TOTAL ITEM | `UnitPrice`, `GrossAmount`, `NetAmount` y totales (IVA 0 %) |
 | IDENTIFICACION PRODUCTO / DESCRIPCION | `Item.Gtin` / `Item.Description` |
@@ -64,14 +64,22 @@ Protecciones: números repetidos dentro del mismo archivo se marcan como error; 
 
 Las columnas se reconocen por el nombre del encabezado, no por la posición.
 
-## Estructura
-- `src/server.js` rutas HTTP y envío por lotes
-- `src/excel.js` lectura del Excel
-- `src/mapper.js` fila → JSON de Saphety y validaciones
-- `src/saphety.js` token, envío, modo simulado
-- `src/almacen/` perfiles e historial: `supabase.js` (producción) o `archivo.js` (local)
-- `src/cifrado.js` cifrado de la contraseña de Saphety
-- `supabase/esquema.sql` tablas y funciones de la base de datos
-- `api/index.js`, `vercel.json` despliegue en Vercel
-- `scripts/migrar-a-supabase.js` copia los perfiles locales a Supabase
-- `public/` pantallas (HTML + JS sin dependencias)
+## Arquitectura (por capas)
+Monolito desplegado como una función serverless. Las dependencias van solo hacia abajo:
+**rutas → controladores → servicios → dominio / repositorios / infraestructura**.
+
+| Capa | Carpeta | Responsabilidad |
+|---|---|---|
+| Entrada | `src/server.js`, `src/app.js`, `api/index.js` | Arranque local, composición de Express, entrada en Vercel |
+| Composición | `src/contenedor.js` | Inyección de dependencias: crea repositorios y servicios |
+| Rutas | `src/rutas/` | URL → middleware → controlador. Sin lógica |
+| Middlewares | `src/middlewares/` | Sesión, manejo de errores, envoltorio async |
+| Controladores | `src/controladores/` | Traducen HTTP ↔ servicio (req → parámetros, resultado → JSON/cookie). Sin reglas de negocio |
+| Servicios | `src/servicios/` | Lógica de negocio y permisos: autenticación, compañías, usuarios, documentos (conversión, duplicados, consecutivo, envío), historial |
+| Dominio | `src/dominio/` | Reglas puras: fila → JSON de Saphety y validaciones (`mapper.js`), capitales, errores de negocio |
+| Repositorios | `src/repositorios/` | Acceso a datos con la misma interfaz: `supabase.js` (producción) o `archivo.js` (local y pruebas) |
+| Infraestructura | `src/infraestructura/` | Cliente de la API de Saphety, lectura del Excel, cifrado AES y seguridad (scrypt, sesión firmada) |
+| Configuración | `src/config/` | Variables de entorno y parámetros por defecto de una compañía |
+| Presentación | `public/` | Pantallas HTML + JS sin dependencias |
+
+Otros: `supabase/esquema.sql` (tablas y funciones), `vercel.json` (despliegue), `scripts/migrar-a-supabase.js`, `test/` (servicios con repositorios falsos, dominio y flujo HTTP completo con una API de Saphety falsa).

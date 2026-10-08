@@ -12,8 +12,8 @@ process.env.APP_USUARIO = 'Jefe';
 process.env.APP_CLAVE = 'clave-del-jefe-123';
 process.env.APP_SECRETO = 'secreto-de-prueba';
 const { app } = require('../src/server');
-const { crearAlmacenArchivo } = require('../src/almacen/archivo');
-const { hashClave, verificarClave } = require('../src/sesion');
+const { crearAlmacenArchivo } = require('../src/repositorios/archivo');
+const { hashClave, verificarClave } = require('../src/infraestructura/seguridad');
 
 test('hash de contraseñas', () => {
   const h = hashClave('una-clave-larga');

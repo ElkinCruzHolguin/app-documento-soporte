@@ -4,8 +4,8 @@
 // Uso: npm run migrar   (lee SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY y APP_SECRETO del archivo .env)
 const fs = require('node:fs');
 const path = require('node:path');
-const { crearCifrador } = require('../src/cifrado');
-const { crearAlmacenSupabase } = require('../src/almacen/supabase');
+const { crearCifrador } = require('../src/infraestructura/cifrado');
+const { crearAlmacenSupabase } = require('../src/repositorios/supabase');
 
 async function main() {
   const dir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');

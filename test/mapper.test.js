@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { construirDocumento, calcularDV } = require('../src/mapper');
+const { construirDocumento, calcularDV } = require('../src/dominio/mapper');
 
 const CFG = { nit: '860031699', digitoVerificacion: '0', serieExternalKeyDS: 'CLAVE', emailProveedorDefecto: 'ds@empresa.com' };
 
@@ -77,7 +77,7 @@ test('proveedor no residente: ciudad del Excel, capital del país o error', () =
   assert.ok(!conCiudad.advertencias.some((a) => a.includes('capital del país')));
 
   // Lista completa de países, todos con ciudad y departamento
-  const { CAPITALES } = require('../src/capitales');
+  const { CAPITALES } = require('../src/dominio/capitales');
   assert.ok(Object.keys(CAPITALES).length >= 240);
   for (const [codigo, u] of Object.entries(CAPITALES)) assert.ok(/^[A-Z]{2}$/.test(codigo) && u.ciudad && u.departamento, codigo);
 

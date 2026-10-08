@@ -162,7 +162,7 @@ test('flujo completo', async () => {
     assert.strictEqual(sinToken.datos.estado, 'error_envio');
     assert.strictEqual(sinToken.datos.detener, true);
     // El error de envío queda en el historial y la fila muestra un aviso (no bloquea)
-    const { crearAlmacenArchivo } = require('../src/almacen/archivo');
+    const { crearAlmacenArchivo } = require('../src/repositorios/archivo');
     const previos = await crearAlmacenArchivo(process.env.DATA_DIR).envios.previos('860031699', ['DSE7471', 'DSE7460']);
     assert.deepStrictEqual(previos.get('DSE7471'), { aceptadoComo: null, errorEnvio: true });
     assert.deepStrictEqual(previos.get('DSE7460'), { aceptadoComo: 'DSE7460', errorEnvio: false });

@@ -48,7 +48,7 @@ const DEFAULTS = {
 function conDefaults(config) {
   const c = { ...DEFAULTS, ...(config || {}) };
   c.tiposDocumento = { ...DEFAULTS.tiposDocumento, ...((config && config.tiposDocumento) || {}) };
-  // Campos retirados (ubicación de extranjeros): ahora se usa la capital del país (src/capitales.js).
+  // Campos retirados (ubicación de extranjeros): ahora se usa la capital del país (src/dominio/capitales.js).
   for (const k of ['ubicacionesExtranjeros', 'ciudadExtranjeroDefecto', 'departamentoExtranjeroDefecto']) delete c[k];
   return c;
 }

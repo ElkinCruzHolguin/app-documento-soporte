@@ -1,7 +1,7 @@
 'use strict';
-const { conDefaults } = require('../config');
+const { conDefaults } = require('../config/parametros');
 
-const fallo = (status, mensaje) => Object.assign(new Error(mensaje), { status });
+const { fallo } = require('../dominio/errores');
 
 // Lo que puede ver el navegador de un perfil: nunca la contraseña.
 const publico = (p) => p && ({ id: p.id, nombre: p.nombre, activo: !!p.activo, config: conDefaults(p.config), tieneClave: !!p.claveCifrada });

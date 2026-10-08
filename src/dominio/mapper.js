@@ -2,7 +2,7 @@
 // Convierte una fila del Excel en el JSON de Documento Soporte de Saphety
 // (POST /v2/{opv}/outbounddocuments/supportDocument) y valida la fila.
 
-const { conDefaults } = require('./config');
+const { conDefaults } = require('../config/parametros');
 const { CAPITALES } = require('./capitales');
 
 const PRIMOS_DV = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
@@ -144,7 +144,7 @@ function construirDocumento(datos, configuracion, opciones = {}) {
     Object.assign(address, { DepartmentCode: dep, CityCode: ciudad });
     if (postal) address.PostalCode = postal;
   } else {
-    // Orden: columnas del Excel -> capital del país (src/capitales.js).
+    // Orden: columnas del Excel -> capital del país (src/dominio/capitales.js).
     const capital = CAPITALES[pais] || {};
     let ciudad = texto(d.municipio);
     let dep = texto(d.departamento);

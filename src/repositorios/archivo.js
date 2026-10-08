@@ -3,8 +3,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { DEFAULTS, conDefaults } = require('../config');
-const { llaveDesdeTexto, crearCifrador } = require('../cifrado');
+const { DEFAULTS, conDefaults } = require('../config/parametros');
+const { llaveDesdeTexto, crearCifrador } = require('../infraestructura/cifrado');
 const { publico, resumenEnvio, fallo, resumirPrevios, usuarioPublico } = require('./comun');
 
 function crearAlmacenArchivo(dir) {

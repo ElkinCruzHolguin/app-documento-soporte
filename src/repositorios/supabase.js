@@ -3,8 +3,8 @@
 // vive en variables de entorno del servidor; las tablas tienen RLS sin políticas.
 // Esquema: supabase/esquema.sql
 const { createClient } = require('@supabase/supabase-js');
-const { DEFAULTS, conDefaults } = require('../config');
-const { llaveDesdeTexto, crearCifrador } = require('../cifrado');
+const { DEFAULTS, conDefaults } = require('../config/parametros');
+const { llaveDesdeTexto, crearCifrador } = require('../infraestructura/cifrado');
 const { publico, resumenEnvio, fallo, resumirPrevios, usuarioPublico } = require('./comun');
 
 function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
