@@ -97,9 +97,7 @@
         <div><label>Informar IVA 0 %</label><select name="incluirIvaCero"><option value="true">Sí</option><option value="false">No</option></select></div>
         <div><label>Enviar teléfono del proveedor</label><select name="incluirTelefono"><option value="true">Sí</option><option value="false">No</option></select></div>
       </div>
-      <h3>Ubicación de proveedores extranjeros</h3>
-      <p class="ayuda">Para no residentes Saphety pide el nombre de la ciudad y del departamento/estado. Clave: identificación del proveedor (CEDULA O NIT) o código de país (por ejemplo "MX"). Si un proveedor nuevo no está aquí, se usa la capital de su país (México → Ciudad de México, Panamá → Ciudad de Panamá…) y la fila muestra un aviso.</p>
-      <textarea name="ubicacionesExtranjeros" rows="12"></textarea>
+      <p class="ayuda">Proveedores no residentes: si el Excel no trae ciudad, se usa la capital de su país (México → Ciudad de México, Panamá → Ciudad de Panamá…) y la fila muestra un aviso. La ciudad por defecto solo se usa para países sin capital registrada.</p>
       <h3>Tipo de documento DIAN → DocumentType de Saphety</h3>
       <textarea name="tiposDocumento" rows="8"></textarea>
       <div class="fila-botones">

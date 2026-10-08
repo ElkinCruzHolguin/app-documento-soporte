@@ -144,22 +144,19 @@ function construirDocumento(datos, configuracion, opciones = {}) {
     Object.assign(address, { DepartmentCode: dep, CityCode: ciudad });
     if (postal) address.PostalCode = postal;
   } else {
-    // Orden: columnas del Excel -> tabla por proveedor -> tabla por país -> capital del país -> valor por defecto.
-    const tabla = cfg.ubicacionesExtranjeros || {};
-    const porProveedor = tabla[identificacion] || {};
-    const porPais = tabla[pais] || {};
+    // Orden: columnas del Excel -> capital del país -> valor por defecto de Administración.
     const capital = CAPITALES[pais] || {};
-    let ciudad = texto(d.municipio) || texto(porProveedor.ciudad) || texto(porPais.ciudad);
-    let dep = texto(d.departamento) || texto(porProveedor.departamento) || texto(porPais.departamento);
+    let ciudad = texto(d.municipio);
+    let dep = texto(d.departamento);
     if ((!ciudad || !dep) && capital.ciudad) {
       ciudad = ciudad || capital.ciudad;
       dep = dep || capital.departamento;
-      advertencias.push(`Proveedor no residente ${identificacion}: se usó la capital del país (${ciudad}, ${dep}) porque no hay ciudad registrada.`);
+      advertencias.push(`Proveedor no residente ${identificacion}: se usó la capital del país (${ciudad}, ${dep}) porque el Excel no trae la ciudad.`);
     }
     ciudad = ciudad || cfg.ciudadExtranjeroDefecto;
     dep = dep || cfg.departamentoExtranjeroDefecto;
     if (!ciudad || !dep) {
-      errores.push(`Proveedor no residente ${identificacion}: falta ciudad o departamento/estado. Agrégalo en Administración › Ubicación de proveedores extranjeros.`);
+      errores.push(`Proveedor no residente ${identificacion}: falta ciudad o departamento/estado: el país ${pais || '(vacío)'} no tiene capital registrada (src/capitales.js) y no hay ciudad por defecto en Administración.`);
     }
     Object.assign(address, { DepartmentName: dep, CityName: ciudad });
     const postal = texto(d.codigoPostal);

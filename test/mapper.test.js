@@ -53,17 +53,15 @@ test('retención en la fuente con tasa decimal', () => {
   assert.strictEqual(json.Total.PayableAmount, '80000.00');
 });
 
-test('proveedor no residente: ciudad por tabla de proveedor, por país o error', () => {
+test('proveedor no residente: ciudad del Excel, capital del país o error', () => {
   const ext = { ...filaResidente, identificacion: 'VVM200921JN2', pais: 'MX', precedencia: 11, tipoDocumento: 42, tipoPersona: 1, municipio: null, departamento: null, codigoPostal: '64410' };
-  const porProveedor = construirDocumento(ext, CFG);
-  assert.deepStrictEqual(porProveedor.errores, []);
-  assert.strictEqual(porProveedor.json.OperationType, '11');
-  assert.strictEqual(porProveedor.json.SupplierParty.Identification.DocumentType, 'ForeignerCard');
-  assert.strictEqual(porProveedor.json.SupplierParty.Identification.CheckDigit, undefined);
-  assert.strictEqual(porProveedor.json.SupplierParty.Address.CityName, 'Monterrey');
-  assert.strictEqual(porProveedor.json.SupplierParty.Address.DepartmentName, 'Nuevo León');
+  const r = construirDocumento(ext, CFG);
+  assert.deepStrictEqual(r.errores, []);
+  assert.strictEqual(r.json.OperationType, '11');
+  assert.strictEqual(r.json.SupplierParty.Identification.DocumentType, 'ForeignerCard');
+  assert.strictEqual(r.json.SupplierParty.Identification.CheckDigit, undefined);
 
-  // Proveedor nuevo: capital del país, con advertencia (no bloquea el envío)
+  // Sin ciudad en el Excel: capital del país, con advertencia (no bloquea el envío)
   const nuevo = { ...ext, identificacion: 'NUEVO123' };
   const porCapital = construirDocumento(nuevo, CFG);
   assert.deepStrictEqual(porCapital.errores, []);
@@ -73,11 +71,10 @@ test('proveedor no residente: ciudad por tabla de proveedor, por país o error',
   const panama = construirDocumento({ ...nuevo, pais: 'PA' }, CFG);
   assert.strictEqual(panama.json.SupplierParty.Address.CityName, 'Ciudad de Panamá');
 
-  // La tabla de Administración por país tiene prioridad sobre la capital
-  const porPais = construirDocumento(nuevo, { ...CFG, ubicacionesExtranjeros: { MX: { ciudad: 'Monterrey', departamento: 'Nuevo León' } } });
-  assert.deepStrictEqual(porPais.errores, []);
-  assert.strictEqual(porPais.json.SupplierParty.Address.CityName, 'Monterrey');
-  assert.ok(!porPais.advertencias.some((a) => a.includes('capital del país')));
+  // Si el Excel trae la ciudad, se usa esa y no hay aviso
+  const conCiudad = construirDocumento({ ...nuevo, municipio: 'Monterrey', departamento: 'Nuevo León' }, CFG);
+  assert.strictEqual(conCiudad.json.SupplierParty.Address.CityName, 'Monterrey');
+  assert.ok(!conCiudad.advertencias.some((a) => a.includes('capital del país')));
 
   // País sin capital conocida ni valor por defecto: error
   assert.ok(construirDocumento({ ...nuevo, pais: 'ZZ' }, CFG).errores.some((e) => e.includes('falta ciudad')));

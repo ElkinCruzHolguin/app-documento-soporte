@@ -67,7 +67,7 @@ function limpiarConfig(entrada) {
   for (const k of CAMPOS_NUMERICOS) if (k in c) c[k] = Number(c[k]) || 0;
   for (const k of CAMPOS_BOOLEANOS) if (k in c) c[k] = c[k] === true || c[k] === 'true';
   for (const [k, v] of Object.entries(c)) if (typeof v === 'string') c[k] = v.trim();
-  for (const [k, nombre] of [['tiposDocumento', 'tipos de documento'], ['ubicacionesExtranjeros', 'ubicación de proveedores extranjeros']]) {
+  for (const [k, nombre] of [['tiposDocumento', 'tipos de documento']]) {
     if (typeof c[k] !== 'string') continue;
     try { c[k] = JSON.parse(c[k]); } catch { throw fallo(400, `La tabla de ${nombre} no es un JSON válido.`); }
   }
