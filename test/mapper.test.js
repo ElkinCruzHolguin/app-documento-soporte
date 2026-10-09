@@ -128,3 +128,11 @@ test('mensaje de Saphety: incluye el campo y no repite errores iguales', () => {
   const e = { Code: 'NotFound', Field: 'SupportDocument.serieExternalKey', Description: null, ExplanationValues: [] };
   assert.strictEqual(mensajeRespuesta({ Errors: [e, { ...e }] }), 'NotFound: SupportDocument.serieExternalKey');
 });
+
+test('avisos de reglas DIAN: código postal (DSAJ08a) y fecha por operación (DSFC02b)', () => {
+  const { advertencias } = construirDocumento({ ...filaResidente, codigoPostal: null }, CFG);
+  assert.ok(advertencias.some((a) => a.includes('DSAJ08a')));
+  assert.ok(advertencias.some((a) => a.includes('DSFC02b')), 'FECHA_DOC 2026-08-03 no es hoy');
+  const hoy = construirDocumento(filaResidente, { ...CFG, fechaEmision: 'hoy' });
+  assert.ok(!hoy.advertencias.some((a) => a.includes('DSFC02b')));
+});

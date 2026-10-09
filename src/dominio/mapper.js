@@ -144,7 +144,8 @@ function construirDocumento(datos, configuracion, opciones = {}) {
     const postal = pad(d.codigoPostal, 6);
     if (!dep || !ciudad) errores.push('Proveedor residente sin DEPARTAMENTO o MUNICIPIO.');
     else if (!ciudad.startsWith(dep)) errores.push(`MUNICIPIO ${ciudad} no pertenece al DEPARTAMENTO ${dep}.`);
-    if (postal && !/^\d{6}$/.test(postal)) advertencias.push(`CODIGO POSTAL "${postal}" no tiene 6 dígitos.`);
+    if (!postal) advertencias.push('Proveedor residente sin CODIGO POSTAL: la DIAN puede rechazarlo (regla DSAJ08a).');
+    else if (!/^\d{6}$/.test(postal)) advertencias.push(`CODIGO POSTAL "${postal}" no tiene 6 dígitos.`);
     Object.assign(address, { DepartmentCode: dep, CityCode: ciudad });
     if (postal) address.PostalCode = postal;
   } else {
@@ -266,6 +267,10 @@ function construirDocumento(datos, configuracion, opciones = {}) {
     }
     return { linea, monto };
   });
+  // Regla DSFC02b: por operación, la fecha de la línea debe ser la de la firma (hoy).
+  if (lineas.some((l) => l.linea.InvoicePeriod.DescriptionCode === '1' && l.linea.InvoicePeriod.From !== ahora.fecha)) {
+    advertencias.push(`Fecha de emisión ${fechaEmision} distinta de hoy (${ahora.fecha}): la DIAN rechaza compras "por operación" con fecha anterior (regla DSFC02b). Usa fecha de emisión «hoy» en Administración.`);
+  }
   if (retenciones.some((r) => r.categoria === '05') && !ivas.some((v) => v.valor > 0)) {
     advertencias.push('ReteIVA informado pero el documento no tiene IVA; para ReteIVA la base es el valor del IVA.');
   }
