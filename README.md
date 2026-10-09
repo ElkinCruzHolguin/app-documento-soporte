@@ -1,6 +1,6 @@
 # App de documentos soporte (Saphety)
 
-Carga un Excel donde **cada fila es un documento soporte**, valida las filas, arma el JSON de Saphety y lo envía a la API: primero pide el token (`POST /v2/auth/gettoken`) y luego crea el documento (`POST /v2/{opv}/outbounddocuments/supportDocument`), igual que en Postman.
+Carga un Excel donde **cada fila es una línea de un documento soporte** (las filas con el mismo PREFIJO + FOLIO forman un solo documento; lo normal es una fila por documento), valida las filas, arma el JSON de Saphety y lo envía a la API: primero pide el token (`POST /v2/auth/gettoken`) y luego crea el documento (`POST /v2/{opv}/outbounddocuments/supportDocument`), igual que en Postman.
 
 ## Requisitos
 - Node.js 22 o superior.
@@ -35,12 +35,12 @@ La contraseña de Saphety se escribe en Administración, se guarda cifrada (AES-
 
 ## Uso
 1. **Administración**: crea o edita el perfil (ambiente). Ahí se parametrizan usuario (correo), contraseña, URL, opv, companyId, NIT y DV del adquiriente, SerieExternalKey de DS, numeración, modo de envío y valores por defecto. La contraseña se guarda cifrada y nunca se muestra; si dejas el campo vacío se conserva la actual. «Probar conexión» solo pide el token.
-2. **Cargar y enviar**: sube el Excel. La app lo convierte al JSON de Saphety y cada fila queda «Lista para enviar» o «Con errores» (con el motivo). Haz clic en una fila para ver o copiar el JSON. «Descargar JSON» baja el JSON de todas las filas válidas.
+2. **Cargar y enviar**: sube el Excel. La app lo convierte al JSON de Saphety y cada documento queda «Lista para enviar» o «Con errores» (con el motivo). Haz clic en una fila para ver o copiar el JSON. «Descargar JSON» baja el JSON de todas las filas válidas.
 3. Selecciona filas y pulsa **Enviar**. En modo **simulado** (por defecto) no sale nada a internet. En modo **real** pide confirmación y envía de a uno; en pantalla se ve la respuesta de Saphety (errores DIAN, Id, CUDS y el XML descargable).
 
 4. **Historial**: cada envío real queda guardado con el JSON enviado, la respuesta de Saphety y el XML. El Excel y los envíos simulados no se guardan.
 
-Protecciones: números repetidos dentro del mismo archivo se marcan como error; un documento del Excel (PREFIJO + FOLIO) que Saphety ya aceptó, con cualquier numeración, se marca como error y no se reenvía; si su último envío quedó con error de conexión se muestra un aviso para revisarlo en Saphety; si falla el token se detiene el envío.
+Protecciones: si las filas de un mismo folio no coinciden en CEDULA O NIT, FECHA_DOC o MONEDA el documento se marca con error; un documento del Excel (PREFIJO + FOLIO) que Saphety ya aceptó, con cualquier numeración, se marca como error y no se reenvía; si su último envío quedó con error de conexión se muestra un aviso para revisarlo en Saphety; si falla el token se detiene el envío.
 
 ## Mapeo Excel → JSON
 | Columna del Excel | Campo Saphety |
@@ -55,7 +55,8 @@ Protecciones: números repetidos dentro del mismo archivo se marcan como error; 
 | OBLIGACIONES FISCALES / OBLIGACIONES IMPUESTO | `ResponsabilityTypes` / `TaxScheme` |
 | DIRECCION, DEPARTAMENTO, MUNICIPIO, CODIGO POSTAL | `Address`: códigos DIAN con ceros a la izquierda para residentes. Para no residentes, `CityName`/`DepartmentName` salen de MUNICIPIO/DEPARTAMENTO si el Excel los trae; si no, la capital del país según PAIS (`src/dominio/capitales.js`, todos los países ISO) con un aviso |
 | TELEFONO (si no es 0) | `Telephone` |
-| VALOR_TOTAL ITEM | `UnitPrice`, `GrossAmount`, `NetAmount` y totales (IVA 0 %) |
+| VALOR_TOTAL ITEM | `UnitPrice`, `GrossAmount`, `NetAmount` de la línea; los totales suman todas las líneas |
+| tasa_ % iva, excluido iva (opcionales) | IVA 01 de la línea a esa tasa (19 o 0.19), o `ExcludeVat` si «excluido iva» es SI. Sin estas columnas la línea va con IVA 0 % |
 | IDENTIFICACION PRODUCTO / DESCRIPCION | `Item.Gtin` / `Item.Description` |
 | CONCEPTO LINEA | `InvoicePeriod.DescriptionCode` |
 | base/tasa/valor reteiva y retefuente | `WithholdingTaxSubTotals` 05 (ReteIVA) y 06 (ReteRenta) en línea y total |

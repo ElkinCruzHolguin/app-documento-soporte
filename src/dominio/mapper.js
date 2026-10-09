@@ -54,14 +54,16 @@ function numeracionExcel(d) {
 }
 
 /**
- * @param {object} datos  fila del Excel (campos de excel.js)
+ * @param {object|object[]} datos  fila del Excel (campos de excel.js), o las filas de un mismo
+ *   documento (mismo PREFIJO + FOLIO): la primera da el encabezado y cada fila es una línea.
  * @param {object} configuracion  parámetros del perfil activo
  * @param {object} opciones  { numeracion: {prefijo, numero} } para forzar la numeración (consecutivo)
  * @returns {{ json: object|null, errores: string[], advertencias: string[], resumen: object }}
  */
 function construirDocumento(datos, configuracion, opciones = {}) {
   const cfg = conDefaults(configuracion);
-  const d = datos;
+  const filas = (Array.isArray(datos) ? datos : [datos]).filter(Boolean);
+  const d = filas[0] || {};
   const errores = [];
   const advertencias = [];
 
@@ -78,12 +80,14 @@ function construirDocumento(datos, configuracion, opciones = {}) {
   const ahora = ahoraBogota();
   const fechaEmision = cfg.fechaEmision === 'hoy' ? ahora.fecha : fechaDoc;
   const issueDate = `${fechaEmision}T${ahora.hora}`;
-  const fechaItem = texto(d.fechaItem);
 
-  // --- Valores
-  const valor = numero(d.valor);
-  if (valor === null) errores.push('VALOR_TOTAL ITEM vacío o no numérico.');
-  else if (valor <= 0) errores.push('VALOR_TOTAL ITEM debe ser mayor que cero.');
+  // Las filas de un mismo documento deben coincidir en el encabezado.
+  for (const [i, f] of filas.entries()) {
+    if (i === 0) continue;
+    for (const [campo, nombre] of [['identificacion', 'CEDULA O NIT'], ['fechaDoc', 'FECHA_DOC'], ['moneda', 'MONEDA']]) {
+      if (texto(f[campo]) !== texto(d[campo])) errores.push(`Línea ${i + 1}: ${nombre} "${texto(f[campo])}" distinto de la primera fila ("${texto(d[campo])}").`);
+    }
+  }
 
   const moneda = texto(d.moneda).toUpperCase() || 'COP';
 
@@ -180,74 +184,114 @@ function construirDocumento(datos, configuracion, opciones = {}) {
   const telefono = texto(d.telefono).replace(/\.0+$/, '');
   if (cfg.incluirTelefono && telefono && telefono !== '0') supplier.Telephone = telefono;
 
-  // --- Línea
-  const monto = valor || 0;
-  const concepto = texto(d.conceptoLinea) || '1';
-  if (!['1', '2'].includes(concepto)) errores.push(`CONCEPTO LINEA "${concepto}" debe ser 1 (por operación) o 2 (acumulado).`);
-  // Regla DSFC02b: con "por operación" (1) la fecha del periodo debe ser la de emisión.
-  const desde = concepto === '2' && fechaItem ? fechaItem : fechaEmision;
-  // Si FECHA_ITEM es distinta, se conserva en las notas del documento.
-
-  const descripcion = texto(d.descripcion);
-  const linea = {
-    Number: '1',
-    Quantity: '1.00',
-    QuantityUnitOfMeasure: cfg.unidadMedida,
-    UnitPrice: dinero(monto),
-    GrossAmount: dinero(monto),
-    NetAmount: dinero(monto),
-    Item: { Description: descripcion },
-    InvoicePeriod: { From: desde, DescriptionCode: concepto },
-  };
-  if (texto(d.codigoProducto)) linea.Item.Gtin = texto(d.codigoProducto);
-  if (cfg.incluirIvaCero) {
-    linea.TaxSubTotals = [{ TaxCategory: '01', TaxPercentage: '0.00', TaxableAmount: dinero(monto), TaxAmount: '0.00' }];
-    linea.TaxTotals = [{ TaxCategory: '01', TaxAmount: '0.00', RoundingAmount: '0.00' }];
-  }
-
-  // --- Retenciones (05 ReteIVA, 06 ReteRenta)
+  // --- Líneas (una por fila)
   const retenciones = [];
-  const agregarRetencion = (categoria, nombre, base, tasa, valorRet) => {
-    base = numero(base); tasa = numero(tasa); valorRet = numero(valorRet);
-    if (base === null && tasa === null && valorRet === null) return;
-    if (base === null || (valorRet === null && tasa === null)) {
-      errores.push(`${nombre}: faltan base y valor (o tasa).`);
-      return;
+  const ivas = []; // { porcentaje, base, valor }
+  const fechasItem = [];
+  const lineas = filas.map((f, i) => {
+    const pre = filas.length > 1 ? `Línea ${i + 1}: ` : '';
+    const valor = numero(f.valor);
+    if (valor === null) errores.push(`${pre}VALOR_TOTAL ITEM vacío o no numérico.`);
+    else if (valor <= 0) errores.push(`${pre}VALOR_TOTAL ITEM debe ser mayor que cero.`);
+    const monto = valor || 0;
+
+    const concepto = texto(f.conceptoLinea) || '1';
+    if (!['1', '2'].includes(concepto)) errores.push(`${pre}CONCEPTO LINEA "${concepto}" debe ser 1 (por operación) o 2 (acumulado).`);
+    const fechaItem = texto(f.fechaItem);
+    // Regla DSFC02b: con "por operación" (1) la fecha del periodo debe ser la de emisión.
+    const desde = concepto === '2' && fechaItem ? fechaItem : fechaEmision;
+    // Si FECHA_ITEM es distinta, se conserva en las notas del documento.
+    if (fechaItem && fechaItem !== desde && !fechasItem.includes(fechaItem)) fechasItem.push(fechaItem);
+
+    const linea = {
+      Number: String(i + 1),
+      Quantity: '1.00',
+      QuantityUnitOfMeasure: cfg.unidadMedida,
+      UnitPrice: dinero(monto),
+      GrossAmount: dinero(monto),
+      NetAmount: dinero(monto),
+      Item: { Description: texto(f.descripcion) },
+      InvoicePeriod: { From: desde, DescriptionCode: concepto },
+    };
+    if (!texto(f.descripcion)) errores.push(`${pre}Falta la DESCRIPCION.`);
+    if (texto(f.codigoProducto)) linea.Item.Gtin = texto(f.codigoProducto);
+
+    // --- IVA: columna opcional "excluido iva" (SI) o "tasa iva" (19, 0.19); sin ellas, IVA 0 % según configuración.
+    const excluido = /^(si|sí|s|x|1|true|verdadero)$/i.test(texto(f.excluidoIva));
+    let tasaIva = numero(f.tasaIva);
+    if (tasaIva !== null && tasaIva > 0 && tasaIva < 1) tasaIva *= 100;
+    if (excluido && tasaIva) errores.push(`${pre}la línea no puede estar excluida de IVA y tener tasa de IVA.`);
+    if (excluido) {
+      linea.ExcludeVat = 'true';
+    } else if (tasaIva || cfg.incluirIvaCero) {
+      const porcentaje = tasaIva || 0;
+      const valorIva = Math.round(((monto * porcentaje) / 100 + Number.EPSILON) * 100) / 100;
+      linea.TaxSubTotals = [{ TaxCategory: '01', TaxPercentage: porcentaje.toFixed(2), TaxableAmount: dinero(monto), TaxAmount: dinero(valorIva) }];
+      linea.TaxTotals = [{ TaxCategory: '01', TaxAmount: dinero(valorIva), RoundingAmount: '0.00' }];
+      ivas.push({ porcentaje, base: monto, valor: valorIva });
     }
-    // Porcentaje: preferimos valor/base porque la tasa del Excel puede venir como 0.035 o 3.5.
-    let porcentaje = valorRet !== null && base ? (valorRet / base) * 100 : (tasa <= 1 ? tasa * 100 : tasa);
-    if (valorRet === null) valorRet = (base * porcentaje) / 100;
-    if (tasa !== null && valorRet !== null) {
-      const esperado1 = base * tasa;
-      const esperado2 = (base * tasa) / 100;
-      if (Math.abs(esperado1 - valorRet) > 1 && Math.abs(esperado2 - valorRet) > 1) {
-        advertencias.push(`${nombre}: valor ${dinero(valorRet)} no cuadra con base × tasa.`);
+
+    // --- Retenciones (05 ReteIVA, 06 ReteRenta)
+    const propias = [];
+    const agregarRetencion = (categoria, nombre, base, tasa, valorRet) => {
+      base = numero(base); tasa = numero(tasa); valorRet = numero(valorRet);
+      if (base === null && tasa === null && valorRet === null) return;
+      if (base === null || (valorRet === null && tasa === null)) {
+        errores.push(`${pre}${nombre}: faltan base y valor (o tasa).`);
+        return;
       }
+      // Porcentaje: preferimos valor/base porque la tasa del Excel puede venir como 0.035 o 3.5.
+      let porcentaje = valorRet !== null && base ? (valorRet / base) * 100 : (tasa <= 1 ? tasa * 100 : tasa);
+      if (valorRet === null) valorRet = (base * porcentaje) / 100;
+      if (tasa !== null && valorRet !== null) {
+        const esperado1 = base * tasa;
+        const esperado2 = (base * tasa) / 100;
+        if (Math.abs(esperado1 - valorRet) > 1 && Math.abs(esperado2 - valorRet) > 1) {
+          advertencias.push(`${pre}${nombre}: valor ${dinero(valorRet)} no cuadra con base × tasa.`);
+        }
+      }
+      propias.push({ categoria, porcentaje, base, valor: valorRet });
+    };
+    agregarRetencion('05', 'ReteIVA', f.baseReteIva, f.tasaReteIva, f.valorReteIva);
+    agregarRetencion('06', 'ReteFuente', f.baseReteFuente, f.tasaReteFuente, f.valorReteFuente);
+    if (propias.length) {
+      linea.WithholdingTaxSubTotals = propias.map((r) => ({
+        WithholdingTaxCategory: r.categoria,
+        TaxPercentage: r.porcentaje.toFixed(2),
+        TaxableAmount: dinero(r.base),
+        TaxAmount: dinero(r.valor),
+      }));
+      linea.WithholdingTaxTotals = propias.map((r) => ({ WithholdingTaxCategory: r.categoria, TaxAmount: dinero(r.valor) }));
+      retenciones.push(...propias);
     }
-    retenciones.push({ categoria, porcentaje, base, valor: valorRet });
-  };
-  agregarRetencion('05', 'ReteIVA', d.baseReteIva, d.tasaReteIva, d.valorReteIva);
-  agregarRetencion('06', 'ReteFuente', d.baseReteFuente, d.tasaReteFuente, d.valorReteFuente);
-  if (retenciones.some((r) => r.categoria === '05')) {
+    return { linea, monto };
+  });
+  if (retenciones.some((r) => r.categoria === '05') && !ivas.some((v) => v.valor > 0)) {
     advertencias.push('ReteIVA informado pero el documento no tiene IVA; para ReteIVA la base es el valor del IVA.');
   }
-  if (retenciones.length) {
-    const sub = retenciones.map((r) => ({
-      WithholdingTaxCategory: r.categoria,
-      TaxPercentage: r.porcentaje.toFixed(2),
-      TaxableAmount: dinero(r.base),
-      TaxAmount: dinero(r.valor),
-    }));
-    const tot = retenciones.map((r) => ({ WithholdingTaxCategory: r.categoria, TaxAmount: dinero(r.valor) }));
-    linea.WithholdingTaxSubTotals = sub;
-    linea.WithholdingTaxTotals = tot;
-  }
+
+  // Totales del documento: impuestos y retenciones agrupados por categoría y porcentaje.
+  const agrupar = (lista, clave) => {
+    const m = new Map();
+    for (const x of lista) {
+      const k = clave(x);
+      const g = m.get(k) || { ...x, base: 0, valor: 0 };
+      g.base += x.base; g.valor += x.valor;
+      m.set(k, g);
+    }
+    return [...m.values()];
+  };
+  const bruto = lineas.reduce((a, l) => a + l.monto, 0);
+  const totalIva = ivas.reduce((a, v) => a + v.valor, 0);
+  const baseIva = ivas.reduce((a, v) => a + v.base, 0);
+  const ivaAgrupado = agrupar(ivas, (v) => v.porcentaje.toFixed(2));
+  const retAgrupadas = agrupar(retenciones, (r) => `${r.categoria}|${r.porcentaje.toFixed(2)}`);
 
   // --- Notas
   const notas = [];
   if (texto(d.numOrden)) notas.push(`Orden de compra: ${texto(d.numOrden)}`);
   if (texto(d.observacion) && texto(d.observacion) !== texto(d.numOrden)) notas.push(`Observación: ${texto(d.observacion)}`);
-  if (fechaItem && fechaItem !== desde) notas.push(`Fecha del servicio: ${fechaItem}`);
+  if (fechasItem.length) notas.push(`Fecha del servicio: ${fechasItem.join(', ')}`);
 
   // --- Documento
   const json = {
@@ -270,24 +314,30 @@ function construirDocumento(datos, configuracion, opciones = {}) {
       },
     },
     SupplierParty: supplier,
-    Lines: [linea],
+    Lines: lineas.map((l) => l.linea),
     Total: {
-      GrossAmount: dinero(monto),
-      TotalBillableAmount: dinero(monto),
-      PayableAmount: dinero(monto),
-      TaxableAmount: cfg.incluirIvaCero ? dinero(monto) : '0.00',
+      GrossAmount: dinero(bruto),
+      TotalBillableAmount: dinero(bruto + totalIva),
+      PayableAmount: dinero(bruto + totalIva),
+      TaxableAmount: dinero(baseIva),
     },
   };
   if (cfg.digitoVerificacion && cfg.nit && String(cfg.digitoVerificacion) !== calcularDV(cfg.nit)) {
     errores.push(`El dígito de verificación configurado (${cfg.digitoVerificacion}) no corresponde al NIT ${cfg.nit} (debería ser ${calcularDV(cfg.nit)}).`);
   }
-  if (cfg.incluirIvaCero) {
-    json.TaxSubTotals = [{ TaxCategory: '01', TaxPercentage: '0.00', TaxableAmount: dinero(monto), TaxAmount: '0.00' }];
-    json.TaxTotals = [{ TaxCategory: '01', TaxAmount: '0.00', RoundingAmount: '0.00' }];
+  if (ivas.length) {
+    json.TaxSubTotals = ivaAgrupado.map((v) => ({ TaxCategory: '01', TaxPercentage: v.porcentaje.toFixed(2), TaxableAmount: dinero(v.base), TaxAmount: dinero(v.valor) }));
+    json.TaxTotals = [{ TaxCategory: '01', TaxAmount: dinero(totalIva), RoundingAmount: '0.00' }];
   }
-  if (retenciones.length) {
-    json.WithholdingTaxSubTotals = linea.WithholdingTaxSubTotals;
-    json.WithholdingTaxTotals = linea.WithholdingTaxTotals;
+  if (retAgrupadas.length) {
+    json.WithholdingTaxSubTotals = retAgrupadas.map((r) => ({
+      WithholdingTaxCategory: r.categoria,
+      TaxPercentage: r.porcentaje.toFixed(2),
+      TaxableAmount: dinero(r.base),
+      TaxAmount: dinero(r.valor),
+    }));
+    const porCategoria = agrupar(retenciones, (r) => r.categoria);
+    json.WithholdingTaxTotals = porCategoria.map((r) => ({ WithholdingTaxCategory: r.categoria, TaxAmount: dinero(r.valor) }));
   }
   if (notas.length) json.Notes = [notas.join(' | ').slice(0, 560)];
 
@@ -306,7 +356,8 @@ function construirDocumento(datos, configuracion, opciones = {}) {
       numero: `${num.prefijo}${num.numero}`,
       proveedor: nombreProveedor,
       identificacion,
-      valor: monto,
+      valor: bruto + totalIva,
+      lineas: filas.length,
       moneda,
       fecha: fechaEmision,
       residente,

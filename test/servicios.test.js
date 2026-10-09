@@ -45,3 +45,24 @@ test('historial: una compañía no ve envíos de otra', async () => {
   await assert.rejects(s.obtener(VITRO, 2), { status: 404 });
   assert.strictEqual((await s.obtener(ADMIN, 2)).id, 2);
 });
+
+test('documentos: las filas con el mismo PREFIJO + FOLIO forman un solo documento', async () => {
+  const { crearServicioDocumentos } = require('../src/servicios/documentos.servicio');
+  const fila = (folio, valor, extra = {}) => ({
+    tipo: 'SEDS', prefijo: 'SEDS', prefijoFolio: folio, fechaDoc: '2026-08-05', identificacion: 890300279, proveedor: 'BANCO',
+    valor, descripcion: 'GASTOS', direccion: 'CL 1', municipio: '05001', departamento: '05', pais: 'CO',
+    tipoDocumento: 31, precedencia: 10, tipoPersona: 1, ...extra,
+  });
+  const excel = { leerExcel: async () => ({ hoja: 'h', columnas: {}, faltantes: [], filas: [
+    { numeroFila: 2, datos: fila(1, 100) },
+    { numeroFila: 3, datos: fila(2, 1000, { excluidoIva: 'SI' }) },
+    { numeroFila: 4, datos: fila(2, 200, { tasaIva: 19 }) },
+  ] }) };
+  const config = { nit: '860031699', serieExternalKeyDS: 'K' };
+  const s = crearServicioDocumentos({ companias: { requerida: async () => ({ id: 1, config }) }, envios: { previos: async () => new Map() }, excel });
+  const { documentos } = await s.convertir(VITRO, Buffer.from('x'));
+  assert.deepStrictEqual(documentos.map((d) => [d.fila, d.numero, d.errores.length]), [[2, 'SEDS1', 0], ['3, 4', 'SEDS2', 0]]);
+  assert.strictEqual(documentos[1].json.Lines.length, 2);
+  assert.strictEqual(documentos[1].json.Total.PayableAmount, '1238.00');
+  assert.ok(Array.isArray(documentos[1].datos), 'al enviar se mandan todas las filas del documento');
+});
