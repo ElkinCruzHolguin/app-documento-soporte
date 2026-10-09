@@ -97,3 +97,28 @@ test('numeración forzada (consecutivo de pruebas)', () => {
   assert.strictEqual(json.SeriePrefix, 'SEDS');
   assert.strictEqual(json.CorrelationDocumentId, 'SEDS984000010');
 });
+
+test('varias filas del mismo folio: una línea excluida de IVA y otra con IVA 19 %', () => {
+  const banco = { ...filaResidente, identificacion: 890300279, proveedor: 'BANCO DE OCCIDENTE', tipoPersona: 1, nombre: null, apellidos: null, fechaItem: '2026-08-03' };
+  const filas = [
+    { ...banco, valor: 1287372, descripcion: 'GMF', excluidoIva: 'SI' },
+    { ...banco, valor: 8200, descripcion: 'COMISIÓN', tasaIva: 0.19, baseReteFuente: 8200, tasaReteFuente: 0.04, valorReteFuente: 328 },
+  ];
+  const { json, errores, resumen } = construirDocumento(filas, CFG);
+  assert.deepStrictEqual(errores, []);
+  assert.strictEqual(json.Lines.length, 2);
+  assert.strictEqual(json.Lines[0].ExcludeVat, 'true');
+  assert.strictEqual(json.Lines[0].TaxSubTotals, undefined);
+  assert.strictEqual(json.Lines[1].Number, '2');
+  assert.deepStrictEqual(json.Lines[1].TaxSubTotals[0], { TaxCategory: '01', TaxPercentage: '19.00', TaxableAmount: '8200.00', TaxAmount: '1558.00' });
+  assert.deepStrictEqual(json.TaxSubTotals, json.Lines[1].TaxSubTotals);
+  assert.deepStrictEqual(json.Total, { GrossAmount: '1295572.00', TotalBillableAmount: '1297130.00', PayableAmount: '1297130.00', TaxableAmount: '8200.00' });
+  assert.deepStrictEqual(json.WithholdingTaxTotals, [{ WithholdingTaxCategory: '06', TaxAmount: '328.00' }]);
+  assert.strictEqual(resumen.valor, 1297130);
+  assert.strictEqual(resumen.lineas, 2);
+});
+
+test('filas del mismo folio con proveedor distinto', () => {
+  const { errores } = construirDocumento([filaResidente, { ...filaResidente, identificacion: 901549995 }], CFG);
+  assert.ok(errores.some((e) => e.includes('Línea 2: CEDULA O NIT')));
+});

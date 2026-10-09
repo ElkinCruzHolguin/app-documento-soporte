@@ -52,6 +52,9 @@ const COLUMNAS = {
   valorReteFuente: (h) => h === 'valor retefuente',
   valorTrm: (h) => h === 'valor trm',
   fechaTrm: (h) => h === 'fecha trm',
+  // Opcionales: IVA por línea. "tasa iva" (19 o 0.19) o "excluido iva" (SI) para líneas excluidas.
+  tasaIva: (h) => h === 'tasa iva' || h === 'iva' || h === 'porcentaje iva',
+  excluidoIva: (h) => h === 'excluido iva' || h === 'excluida iva' || h === 'excluido de iva',
   // Opcional: si algún día el Excel trae el correo del proveedor
   emailProveedor: (h) => h === 'email' || h === 'correo' || h === 'email proveedor' || h === 'correo proveedor',
 };

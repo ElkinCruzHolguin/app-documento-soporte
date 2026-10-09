@@ -1,7 +1,7 @@
 'use strict';
 // Documentos soporte: conversión del Excel al JSON de Saphety y envío (real o simulado).
 const { fallo } = require('../dominio/errores');
-const { construirDocumento } = require('../dominio/mapper');
+const { construirDocumento, numeracionExcel } = require('../dominio/mapper');
 
 const soloDigitos = (v) => String(v || '').replace(/\D/g, '');
 const mensajeYaAceptado = (numeroExcel, aceptadoComo) =>
@@ -9,7 +9,7 @@ const mensajeYaAceptado = (numeroExcel, aceptadoComo) =>
 
 function crearServicioDocumentos({ companias, perfiles, envios, saphety, excel, log = console }) {
   return {
-    /** Lee el Excel, arma y valida el JSON de cada fila. No guarda nada. */
+    /** Lee el Excel, arma y valida el JSON de cada documento (filas agrupadas por PREFIJO + FOLIO). No guarda nada. */
     async convertir(actor, archivo) {
       if (!archivo || !archivo.length) throw fallo(400, 'No llegó ningún archivo.');
       const compania = await companias.requerida(actor);
@@ -22,12 +22,21 @@ function crearServicioDocumentos({ companias, perfiles, envios, saphety, excel, 
       if (libro.faltantes.length) throw fallo(400, `Al Excel le faltan columnas: ${libro.faltantes.join(', ')}`);
       if (!libro.filas.length) throw fallo(400, 'El Excel no tiene filas con datos.');
 
+      // Las filas con el mismo PREFIJO + FOLIO son las líneas de un mismo documento.
+      const grupos = new Map();
+      for (const f of libro.filas) {
+        const n = numeracionExcel(f.datos);
+        const clave = n.numero ? `${n.prefijo}${n.numero}`.toUpperCase() : `fila-${f.numeroFila}`;
+        if (!grupos.has(clave)) grupos.set(clave, []);
+        grupos.get(clave).push(f);
+      }
       const vistos = new Set();
-      const documentos = libro.filas.map(({ numeroFila, datos }) => {
+      const documentos = [...grupos.values()].map((grupo) => {
+        const datos = grupo.length > 1 ? grupo.map((f) => f.datos) : grupo[0].datos;
         const v = construirDocumento(datos, compania.config);
-        if (vistos.has(v.resumen.numero)) v.errores.push(`Número ${v.resumen.numero} repetido dentro del archivo.`);
         vistos.add(v.resumen.numero);
-        return { fila: numeroFila, datos, ...v.resumen, errores: v.errores, advertencias: v.advertencias, json: v.json };
+        const fila = grupo.length > 1 ? grupo.map((f) => f.numeroFila).join(', ') : grupo[0].numeroFila;
+        return { fila, datos, ...v.resumen, errores: v.errores, advertencias: v.advertencias, json: v.json };
       });
 
       // El historial dice qué documentos del Excel (PREFIJO + FOLIO) ya se enviaron, en cualquier modo de numeración.
@@ -43,11 +52,11 @@ function crearServicioDocumentos({ companias, perfiles, envios, saphety, excel, 
     },
 
     /**
-     * Envía una fila. En modo real exige confirmación, bloquea documentos ya aceptados,
+     * Envía un documento (una fila, o las filas de un mismo folio). En modo real exige confirmación, bloquea documentos ya aceptados,
      * reserva el consecutivo (si aplica) y deja el envío en el historial.
      */
     async enviar(actor, { datos, confirmado, indice }) {
-      if (!datos || typeof datos !== 'object') throw fallo(400, 'Faltan los datos de la fila.');
+      if (!datos || typeof datos !== 'object' || (Array.isArray(datos) && !datos.length)) throw fallo(400, 'Faltan los datos de la fila.');
       const compania = await companias.requerida(actor);
       const cfg = compania.config;
       const real = cfg.modoEnvio === 'real';
