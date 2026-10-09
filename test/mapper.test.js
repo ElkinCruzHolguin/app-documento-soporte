@@ -122,3 +122,9 @@ test('filas del mismo folio con proveedor distinto', () => {
   const { errores } = construirDocumento([filaResidente, { ...filaResidente, identificacion: 901549995 }], CFG);
   assert.ok(errores.some((e) => e.includes('Línea 2: CEDULA O NIT')));
 });
+
+test('mensaje de Saphety: incluye el campo y no repite errores iguales', () => {
+  const { mensajeRespuesta } = require('../src/infraestructura/saphety');
+  const e = { Code: 'NotFound', Field: 'SupportDocument.serieExternalKey', Description: null, ExplanationValues: [] };
+  assert.strictEqual(mensajeRespuesta({ Errors: [e, { ...e }] }), 'NotFound: SupportDocument.serieExternalKey');
+});

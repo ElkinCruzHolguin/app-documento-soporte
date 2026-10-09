@@ -51,8 +51,13 @@ function olvidarToken(perfilId) {
 function mensajeRespuesta(datos) {
   if (!datos) return 'Respuesta vacía';
   const partes = [];
+  const vistos = new Set(); // Saphety a veces repite el mismo error
+
   for (const e of datos.Errors || []) {
-    partes.push([e.Code, e.Description].filter(Boolean).join(': '));
+    const clave = JSON.stringify(e);
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    partes.push([e.Code, e.Field, e.Description].filter(Boolean).join(': '));
     for (const x of e.ExplanationValues || []) partes.push(`  • ${x}`);
   }
   for (const w of datos.Warnings || []) {
