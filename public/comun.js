@@ -1,4 +1,22 @@
 // Utilidades compartidas por las páginas.
+
+// Menú lateral: una sola lista para todas las páginas. Para agregar una página nueva basta con sumarla aquí
+// y poner <nav id="menu" data-activo="mi-pagina.html"></nav> en su HTML.
+const MENU = [
+  { href: 'index.html', texto: 'Cargar y enviar' },
+  { href: 'emitidos.html', texto: 'Emitidos' },
+  { href: 'recibidos.html', texto: 'Recibidos' },
+  { href: 'historial.html', texto: 'Historial' },
+  { href: 'admin.html', texto: 'Administración', admin: true },
+];
+
+function pintarMenu() {
+  const nav = document.getElementById('menu');
+  if (!nav) return;
+  const activo = nav.dataset.activo || location.pathname.split('/').pop() || 'index.html';
+  nav.innerHTML = MENU.map((m) => `<a href="${m.href}"${m.href === activo ? ' class="activo"' : ''}${m.admin ? ' data-enlace-admin' : ''}>${m.texto}</a>`).join('');
+}
+document.addEventListener('DOMContentLoaded', pintarMenu);
 async function api(ruta, opciones = {}) {
   const resp = await fetch(ruta, opciones);
   if (resp.status === 401) {

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documento recibido</title>
+<link rel="stylesheet" href="app.css">
+<script src="comun.js"></script>
+</head>
+<body>
+<header>
+  <h1>Documentos soporte · Saphety</h1>
+  <nav id="menu" data-activo="recibidos.html"></nav>
+  <div id="banner"></div>
+</header>
+<main>
+  <div class="encabezado">
+    <div>
+      <p class="antetitulo"><a class="enlace-doc" href="recibidos.html">← Recibidos</a> · <span id="tipo"></span></p>
+      <h1 id="titulo">Documento recibido</h1>
+      <p class="ayuda" id="subtitulo"></p>
+    </div>
+    <div class="fila-botones" style="margin:0" id="acciones"></div>
+  </div>
+  <div id="msg"></div>
+
+  <div class="detalle oculto" id="detalle">
+    <section class="panel" style="padding:12px">
+      <iframe class="visor" id="visor" title="Representación gráfica del documento"></iframe>
+    </section>
+    <div>
+      <section class="panel"><h2>Eventos ante la DIAN</h2><div id="eventos"></div></section>
+      <section class="panel"><h2>Resumen</h2><dl class="datos" id="resumen"></dl></section>
+      <section class="panel"><h2>Historial de eventos</h2><div id="respuestas"></div></section>
+    </div>
+  </div>
+</main>
+
+<dialog id="dlgEvento">
+  <form method="dialog" id="formEvento">
+    <div class="cabeza"><b id="dlgTitulo"></b><button type="button" class="secundario" onclick="dlgEvento.close()">Cancelar</button></div>
+    <div class="cuerpo">
+      <div class="aviso warn" id="dlgAviso"></div>
+      <div id="camposPersona" class="rejilla">
+        <div><label for="pNombre">Nombre</label><input id="pNombre" required></div>
+        <div><label for="pApellido">Apellido</label><input id="pApellido" required></div>
+        <div><label for="pTipoDoc">Tipo de documento</label><select id="pTipoDoc"><option value="CC">Cédula de ciudadanía</option><option value="CE">Cédula de extranjería</option><option value="NIT">NIT</option></select></div>
+        <div><label for="pDocumento">Número de documento</label><input id="pDocumento" inputmode="numeric" required></div>
+        <div><label for="pCargo">Cargo</label><input id="pCargo"></div>
+        <div><label for="pArea">Área</label><input id="pArea"></div>
+      </div>
+      <div id="camposReclamo" class="rejilla">
+        <div><label for="concepto">Concepto del reclamo</label><select id="concepto"></select></div>
+      </div>
+      <div id="camposMotivo" style="margin-top:12px"><label for="motivo">Comentario</label><textarea id="motivo" rows="3" maxlength="500" style="font-family:inherit;font-size:14px"></textarea></div>
+      <div class="fila-botones"><button type="submit" id="btnConfirmar">Enviar a la DIAN</button></div>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const fecha = (iso) => (iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }) : '—');
+const id = new URLSearchParams(location.search).get('id') || '';
+const urlArchivo = (formato, descargar) => `/api/recibidos/${encodeURIComponent(id)}/${formato}${descargar ? '?descargar=1' : ''}`;
+const dato = (etiqueta, valor) => `<dt>${esc(etiqueta)}</dt><dd>${valor || '—'}</dd>`;
+const CLAVE_PERSONA = 'radian-persona';
+let info = null;
+let eventoActual = null;
+
+function leerPersona() {
+  try { return JSON.parse(localStorage.getItem(CLAVE_PERSONA)) || {}; } catch { return {}; }
+}
+function guardarPersona(p) {
+  try { localStorage.setItem(CLAVE_PERSONA, JSON.stringify(p)); } catch { /* sin almacenamiento local */ }
+}
+
+function tablaRespuestas(respuestas) {
+  if (!respuestas.length) return '<p class="ayuda">Aún no hay eventos registrados.</p>';
+  if (respuestas.some((r) => !r || typeof r !== 'object')) return `<pre>${esc(JSON.stringify(respuestas, null, 2))}</pre>`;
+  const claves = [...new Set(respuestas.flatMap((r) => Object.keys(r).filter((k) => r[k] == null || typeof r[k] !== 'object')))].slice(0, 6);
+  const valor = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) ? fecha(v) : v);
+  return `<div class="tabla-scroll"><table><thead><tr>${claves.map((k) => `<th>${esc(k)}</th>`).join('')}</tr></thead>
+    <tbody>${respuestas.map((r) => `<tr>${claves.map((k) => `<td>${esc(valor(r[k]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+
+function pintarEventos() {
+  const { documento: d, eventos, modoEnvio } = info;
+  const cont = document.getElementById('eventos');
+  if (!d.eventos.length) {
+    cont.innerHTML = `<p class="ayuda">No hay eventos pendientes: el documento está «${esc(d.estadoTexto)}».</p>`;
+    return;
+  }
+  cont.innerHTML = `
+    <p class="ayuda" style="margin-top:0">Siguiente paso según la DIAN: acuse de recibo (030), recibo del bien o servicio (032) y luego aceptación (033) o reclamo (031). Cada evento se envía al proveedor y a la DIAN y no se puede deshacer.</p>
+    ${modoEnvio !== 'real' ? '<div class="aviso warn">La compañía está en modo simulado: para enviar eventos cámbiala a modo real en Administración.</div>' : ''}
+    <div class="fila-botones">${d.eventos.map((e) => `<button ${e === 'rechazar' ? 'class="peligro"' : ''} data-evento="${e}" ${modoEnvio !== 'real' ? 'disabled' : ''}>${esc(eventos[e].codigo)} · ${esc(eventos[e].nombre)}</button>`).join('')}</div>`;
+  cont.querySelectorAll('[data-evento]').forEach((b) => b.onclick = () => abrirEvento(b.dataset.evento));
+}
+
+function abrirEvento(tipo) {
+  eventoActual = tipo;
+  const ev = info.eventos[tipo];
+  document.getElementById('dlgTitulo').textContent = `${ev.codigo} · ${ev.nombre} · ${info.documento.numero}`;
+  document.getElementById('dlgAviso').textContent = `Vas a registrar «${ev.nombre}» para ${info.documento.numero} de ${info.documento.proveedor}. Se envía a la DIAN y al proveedor y no se puede deshacer.`;
+  document.getElementById('camposPersona').classList.toggle('oculto', !ev.conPersona);
+  document.getElementById('camposReclamo').classList.toggle('oculto', tipo !== 'rechazar');
+  document.getElementById('camposMotivo').classList.toggle('oculto', !!ev.conPersona);
+  for (const el of document.querySelectorAll('#camposPersona input')) el.required = !!ev.conPersona && ['pNombre', 'pApellido', 'pDocumento'].includes(el.id);
+  const p = leerPersona();
+  document.getElementById('pNombre').value = p.nombre || '';
+  document.getElementById('pApellido').value = p.apellido || '';
+  document.getElementById('pTipoDoc').value = p.tipoDocumento || 'CC';
+  document.getElementById('pDocumento').value = p.documento || '';
+  document.getElementById('pCargo').value = p.cargo || '';
+  document.getElementById('pArea').value = p.area || '';
+  document.getElementById('concepto').innerHTML = Object.entries(info.conceptosReclamo).map(([k, v]) => `<option value="${k}">${k} · ${esc(v)}</option>`).join('');
+  document.getElementById('motivo').value = '';
+  document.getElementById('dlgEvento').showModal();
+}
+
+document.getElementById('formEvento').onsubmit = async (ev) => {
+  ev.preventDefault();
+  const persona = {
+    nombre: document.getElementById('pNombre').value, apellido: document.getElementById('pApellido').value,
+    tipoDocumento: document.getElementById('pTipoDoc').value, documento: document.getElementById('pDocumento').value,
+    cargo: document.getElementById('pCargo').value, area: document.getElementById('pArea').value,
+  };
+  const btn = document.getElementById('btnConfirmar');
+  btn.disabled = true;
+  try {
+    const r = await api(`/api/recibidos/${encodeURIComponent(id)}/eventos`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: eventoActual, confirmado: true, persona, motivo: document.getElementById('motivo').value, concepto: document.getElementById('concepto').value }),
+    });
+    if (info.eventos[eventoActual].conPersona) guardarPersona(persona);
+    document.getElementById('dlgEvento').close();
+    await cargar();
+    document.getElementById('msg').insertAdjacentHTML('afterbegin', `<div class="aviso ok">${esc(r.mensaje)}</div>`);
+  } catch (e) {
+    document.getElementById('dlgAviso').textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+async function cargar() {
+  const msg = document.getElementById('msg');
+  msg.innerHTML = '<div class="aviso warn">Consultando Saphety…</div>';
+  try {
+    info = await api(`/api/recibidos/${encodeURIComponent(id)}`);
+    const d = info.documento;
+    document.title = d.numero || 'Documento recibido';
+    document.getElementById('tipo').textContent = d.tipo;
+    document.getElementById('titulo').textContent = d.numero;
+    document.getElementById('subtitulo').innerHTML = `<span class="chip ${esc(d.estado)}">${esc(d.estadoTexto)}</span> · ${esc(d.proveedor)}`;
+    document.getElementById('acciones').innerHTML = `
+      <button class="secundario" id="btnCopiar" ${d.cufe ? '' : 'disabled'}>Copiar CUFE</button>
+      <a class="boton secundario" href="${urlArchivo('xml', true)}">XML</a>
+      <a class="boton secundario" href="${urlArchivo('attached', true)}">AttachedDocument</a>
+      <a class="boton" href="${urlArchivo('pdf', true)}">Descargar PDF</a>`;
+    document.getElementById('btnCopiar').onclick = async () => {
+      await navigator.clipboard.writeText(d.cufe);
+      document.getElementById('btnCopiar').textContent = 'CUFE copiado';
+    };
+    document.getElementById('resumen').innerHTML = [
+      dato('Estado', `<span class="chip ${esc(d.estado)}">${esc(d.estadoTexto)}</span> <span class="codigo">${esc(d.estadoSaphety)}</span>`),
+      dato('Fecha de estado', esc(fecha(d.estadoFecha))),
+      d.motivo ? dato('Motivo', esc(d.motivo)) : '',
+      dato('Proveedor', `${esc(d.proveedor)}<div class="codigo">${esc(d.proveedorCodigo)}</div>`),
+      dato('Adquiriente', `${esc(d.compania)}<div class="codigo">${esc(d.companiaCodigo)}</div>`),
+      dato('Fecha del documento', esc(fecha(d.fechaDocumento))),
+      dato('Recibido en Saphety', esc(fecha(d.fechaCreacion))),
+      dato('Base gravable', d.base != null ? `${esc(d.moneda)} ${pesos(d.base)}` : ''),
+      dato('IVA', d.iva != null ? `${esc(d.moneda)} ${pesos(d.iva)}` : ''),
+      dato('Valor total', `${esc(d.moneda)} ${pesos(d.valor)}`),
+      dato('CUFE', d.cufe ? `<span class="codigo">${esc(d.cufe)}</span>` : ''),
+      d.firmaInvalida ? dato('Firma', '<span class="chip rechazado">Firma inválida</span>') : '',
+    ].join('');
+    document.getElementById('respuestas').innerHTML = tablaRespuestas(info.respuestas);
+    pintarEventos();
+    const visor = document.getElementById('visor');
+    if (!visor.src) visor.src = urlArchivo('pdf');
+    msg.innerHTML = info.avisos.map((a) => `<div class="aviso warn">${esc(a)}</div>`).join('');
+    document.getElementById('detalle').classList.remove('oculto');
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err">${esc(e.message)}</div>`;
+  }
+}
+cargar();
+</script>
+</body>
+</html>

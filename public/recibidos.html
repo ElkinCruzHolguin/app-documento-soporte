@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recibidos</title>
+<link rel="stylesheet" href="app.css">
+<script src="comun.js"></script>
+</head>
+<body>
+<header>
+  <h1>Documentos soporte · Saphety</h1>
+  <nav id="menu" data-activo="recibidos.html"></nav>
+  <div id="banner"></div>
+</header>
+<main>
+  <div class="encabezado">
+    <div>
+      <p class="antetitulo" id="antetitulo">Documentos recibidos</p>
+      <h1>Recibidos</h1>
+      <p class="ayuda">Facturas y notas que los proveedores le envían a tu compañía, desde el buzón de recepción de Saphety. Abre un documento para ver su PDF y registrar los eventos ante la DIAN: acuse de recibo, recibo del bien o servicio, aceptación o reclamo.</p>
+    </div>
+  </div>
+
+  <div class="metricas">
+    <article class="metrica"><p class="etiqueta">Documentos en el rango</p><p class="valor" id="mTotal">—</p><p class="nota" id="mRango"></p></article>
+    <article class="metrica"><p class="etiqueta">Por gestionar</p><p class="valor" id="mPendientes">—</p><p class="nota">En esta página</p></article>
+    <article class="metrica"><p class="etiqueta">Aceptados</p><p class="valor ok" id="mAceptados">—</p><p class="nota">En esta página</p></article>
+    <article class="metrica"><p class="etiqueta">Valor</p><p class="valor" id="mValor">—</p><p class="nota">Suma de esta página (COP)</p></article>
+  </div>
+
+  <section class="panel">
+    <h2>Filtros</h2>
+    <form class="filtros" id="filtros">
+      <div><label for="desde">Desde</label><input type="date" id="desde"></div>
+      <div><label for="hasta">Hasta</label><input type="date" id="hasta"></div>
+      <div><label for="numero">Número (prefijo + consecutivo)</label><input id="numero" placeholder="Ej. FE218128"></div>
+      <div><label for="proveedor">NIT del proveedor</label><input id="proveedor" inputmode="numeric" placeholder="Sin dígito de verificación"></div>
+      <div><label for="estado">Estado</label><select id="estado"><option value="">Todos</option><option value="pendientes">Por gestionar</option><option value="aceptados">Aceptados</option><option value="rechazados">Reclamados</option></select></div>
+      <div><button type="submit">Buscar documentos</button></div>
+    </form>
+    <p class="ayuda">Por fecha de llegada al buzón. Sin fechas se muestran los últimos 30 días.</p>
+  </section>
+
+  <section class="panel">
+    <div id="msg"></div>
+    <div class="tabla-scroll">
+      <table>
+        <thead><tr><th>Recibido</th><th>Tipo / Número</th><th>Proveedor</th><th class="num">IVA</th><th class="num">Valor</th><th>Estado</th><th>Siguiente paso</th></tr></thead>
+        <tbody id="filas"></tbody>
+      </table>
+    </div>
+    <div class="paginacion">
+      <span id="infoPagina"></span>
+      <div class="fila-botones" style="margin:0">
+        <button class="secundario" id="btnAnterior" disabled>Anterior</button>
+        <button class="secundario" id="btnSiguiente" disabled>Siguiente</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const fecha = (iso) => (iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }) : '');
+let pagina = 0;
+const NOMBRE_EVENTO = { acuse: 'Acuse de recibo', reciboBien: 'Recibo del bien', aceptar: 'Aceptar', rechazar: 'Reclamar' };
+
+async function cargar() {
+  const msg = document.getElementById('msg');
+  const filas = document.getElementById('filas');
+  const q = new URLSearchParams({ pagina });
+  for (const id of ['desde', 'hasta', 'numero', 'proveedor', 'estado']) {
+    const v = document.getElementById(id).value.trim();
+    if (v) q.set(id, v);
+  }
+  msg.innerHTML = '<div class="aviso warn">Consultando Saphety…</div>';
+  filas.innerHTML = '';
+  try {
+    const r = await api(`/api/recibidos?${q}`);
+    document.getElementById('desde').value = r.desde;
+    document.getElementById('hasta').value = r.hasta;
+    document.getElementById('antetitulo').textContent = `Documentos recibidos · ${r.compania}`;
+    const docs = r.documentos;
+    const cuenta = (e) => docs.filter((d) => d.estado === e).length;
+    document.getElementById('mTotal').textContent = r.total != null ? r.total.toLocaleString('es-CO') : docs.length;
+    document.getElementById('mRango').textContent = `${r.desde} a ${r.hasta}`;
+    document.getElementById('mPendientes').textContent = docs.filter((d) => d.eventos.length).length;
+    document.getElementById('mAceptados').textContent = cuenta('aceptado');
+    document.getElementById('mValor').textContent = `$ ${docs.reduce((s, d) => s + (d.moneda === 'COP' ? Number(d.valor) || 0 : 0), 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
+    msg.innerHTML = docs.length ? '' : [`No hay documentos recibidos entre ${esc(r.desde)} y ${esc(r.hasta)} con esos filtros. Puedes consultar hasta un año hacia atrás cambiando «Desde».`, ...(r.avisos || []).map(esc)]
+      .map((a) => `<div class="aviso warn">${a}</div>`).join('');
+    filas.innerHTML = docs.map((d) => `<tr class="clic" data-id="${esc(d.id)}">
+      <td>${esc(fecha(d.fechaCreacion))}</td>
+      <td><div class="ayuda" style="margin:0">${esc(d.tipo)}</div><a class="enlace-doc" href="recibido.html?id=${encodeURIComponent(d.id)}">${esc(d.numero)}</a></td>
+      <td>${esc(d.proveedor)}<div class="codigo">${esc(d.proveedorCodigo)}</div></td>
+      <td class="num">${pesos(d.iva)}</td>
+      <td class="num">${d.moneda !== 'COP' ? esc(d.moneda) + ' ' : ''}${pesos(d.valor)}</td>
+      <td><span class="chip ${esc(d.estado)}">${esc(d.estadoTexto)}</span></td>
+      <td>${d.eventos.length ? esc(d.eventos.map((e) => NOMBRE_EVENTO[e]).join(' o ')) : '<span class="ayuda">—</span>'}</td></tr>`).join('');
+    filas.querySelectorAll('tr.clic').forEach((tr) => tr.onclick = (ev) => {
+      if (ev.target.closest('a')) return;
+      location.href = `recibido.html?id=${encodeURIComponent(tr.dataset.id)}`;
+    });
+    const desdeN = r.pagina * r.tamanoPagina;
+    document.getElementById('infoPagina').textContent = docs.length
+      ? `Página ${r.pagina + 1} · mostrando ${desdeN + 1}–${desdeN + docs.length}${r.total != null ? ` de ${r.total.toLocaleString('es-CO')}` : ''}` : '';
+    document.getElementById('btnAnterior').disabled = r.pagina === 0;
+    document.getElementById('btnSiguiente').disabled = !r.hayMas;
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err">${esc(e.message)}</div>`;
+  }
+}
+
+document.getElementById('filtros').onsubmit = (ev) => { ev.preventDefault(); pagina = 0; cargar(); };
+document.getElementById('btnAnterior').onclick = () => { pagina = Math.max(pagina - 1, 0); cargar(); };
+document.getElementById('btnSiguiente').onclick = () => { pagina += 1; cargar(); };
+cargar();
+</script>
+</body>
+</html>
