@@ -42,6 +42,8 @@ La contraseña de Saphety se escribe en Administración, se guarda cifrada (AES-
 
 5. **Emitidos**: consulta en línea en Saphety los documentos soporte y notas de ajuste de la compañía (en los que su NIT es el adquiriente), por rango de fechas y número, con el estado ante la DIAN. Incluye los creados por fuera de esta app. Al abrir uno se ven el PDF, el resumen, los ítems, las respuestas de la DIAN y los errores de validación, y se descargan el PDF, el XML y el AttachedDocument. Requiere el NIT configurado en la compañía; no guarda nada.
 
+6. **Recibidos**: buzón de facturas, notas crédito y notas débito que los proveedores le envían a la compañía, consultado en línea en Saphety, con filtros por fecha, número, NIT del proveedor y estado. Al abrir uno se ven el PDF, el resumen y el historial de eventos, y se registran los eventos RADIAN en el orden de la DIAN: 030 acuse de recibo, 032 recibo del bien o servicio y luego 033 aceptación o 031 reclamo. Los eventos solo se envían con la compañía en modo real, piden confirmación y no se pueden deshacer.
+
 Protecciones: si las filas de un mismo folio no coinciden en CEDULA O NIT, FECHA_DOC o MONEDA el documento se marca con error; un documento del Excel (PREFIJO + FOLIO) que Saphety ya aceptó, con cualquier numeración, se marca como error y no se reenvía; si su último envío quedó con error de conexión se muestra un aviso para revisarlo en Saphety; si falla el token se detiene el envío.
 
 ## Mapeo Excel → JSON
@@ -78,11 +80,13 @@ Monolito desplegado como una función serverless. Las dependencias van solo haci
 | Rutas | `src/rutas/` | URL → middleware → controlador. Sin lógica |
 | Middlewares | `src/middlewares/` | Sesión, manejo de errores, envoltorio async |
 | Controladores | `src/controladores/` | Traducen HTTP ↔ servicio (req → parámetros, resultado → JSON/cookie). Sin reglas de negocio |
-| Servicios | `src/servicios/` | Lógica de negocio y permisos: autenticación, compañías, usuarios, documentos (conversión, duplicados, consecutivo, envío), historial, emitidos (consulta en Saphety) |
-| Dominio | `src/dominio/` | Reglas puras: fila → JSON de Saphety y validaciones (`mapper.js`), filtros y estados de los emitidos (`emitidos.js`), capitales, errores de negocio |
+| Servicios | `src/servicios/` | Lógica de negocio y permisos: autenticación, compañías, usuarios, documentos (conversión, duplicados, consecutivo, envío), historial, emitidos y recibidos (consulta en Saphety y eventos RADIAN) |
+| Dominio | `src/dominio/` | Reglas puras: fila → JSON de Saphety y validaciones (`mapper.js`), filtros y estados de emitidos y recibidos (`emitidos.js`, `recibidos.js`), capitales, errores de negocio |
 | Repositorios | `src/repositorios/` | Acceso a datos con la misma interfaz: `supabase.js` (producción) o `archivo.js` (local y pruebas) |
-| Infraestructura | `src/infraestructura/` | Cliente de la API de Saphety, lectura del Excel, cifrado AES y seguridad (scrypt, sesión firmada) |
+| Infraestructura | `src/infraestructura/` | Cliente de la API de Saphety por área (`saphety/`: emisión, emitidos, recibidos, series, catálogos), lectura del Excel, cifrado AES y seguridad (scrypt, sesión firmada) |
 | Configuración | `src/config/` | Variables de entorno y parámetros por defecto de una compañía |
 | Presentación | `public/` | Pantallas HTML + JS sin dependencias |
 
 Otros: `supabase/esquema.sql` (tablas y funciones), `vercel.json` (despliegue), `scripts/migrar-a-supabase.js`, `test/` (servicios con repositorios falsos, dominio y flujo HTTP completo con una API de Saphety falsa).
+
+Trabajo en equipo: ver [CONTRIBUTING.md](CONTRIBUTING.md) y el plan en [docs/ROADMAP.md](docs/ROADMAP.md).
