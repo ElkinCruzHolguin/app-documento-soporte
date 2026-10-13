@@ -8,6 +8,7 @@ const { crearControladorCompanias } = require('../controladores/companias.contro
 const { crearControladorUsuarios } = require('../controladores/usuarios.controlador');
 const { crearControladorDocumentos } = require('../controladores/documentos.controlador');
 const { crearControladorHistorial } = require('../controladores/historial.controlador');
+const { crearControladorEmitidos } = require('../controladores/emitidos.controlador');
 
 function crearRutasApi({ servicios, entorno }) {
   const opciones = { cookieSegura: entorno.enVercel };
@@ -16,6 +17,7 @@ function crearRutasApi({ servicios, entorno }) {
   const usuarios = crearControladorUsuarios(servicios);
   const documentos = crearControladorDocumentos(servicios);
   const historial = crearControladorHistorial(servicios);
+  const emitidos = crearControladorEmitidos(servicios);
   const r = express.Router();
   const a = asincrono;
 
@@ -45,6 +47,10 @@ function crearRutasApi({ servicios, entorno }) {
 
   r.get('/envios', a(historial.listar));
   r.get('/envios/:id', a(historial.obtener));
+
+  r.get('/emitidos', a(emitidos.listar));
+  r.get('/emitidos/:id', a(emitidos.obtener));
+  r.get('/emitidos/:id/:formato', a(emitidos.archivo));
 
   return r;
 }
