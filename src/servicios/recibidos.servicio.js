@@ -1,7 +1,6 @@
 'use strict';
 // Buzón de recepción: facturas y notas que los proveedores le envían a la compañía, consultadas en Saphety,
-// y los eventos RADIAN (acuse, recibo del bien, aceptación, reclamo). Cada compañía ve solo los suyos; el
-// administrador además puede ver los de toda la cuenta de Saphety (todas las empresas a las que tiene acceso).
+// y los eventos RADIAN (acuse, recibo del bien, aceptación, reclamo). Cada actor ve solo los de su compañía.
 const { fallo } = require('../dominio/errores');
 const { validarId, listaDocumentos, totalBusqueda, TAMANO_PAGINA } = require('../dominio/emitidos');
 const reglas = require('../dominio/recibidos');
@@ -12,13 +11,10 @@ const FORMATOS = {
   attached: { ruta: 'attacheddocument', tipo: 'application/xml', extension: 'attached.xml' },
 };
 
-const esAdmin = (actor) => actor.rol === 'admin';
-
 function crearServicioRecibidos({ companias, perfiles, saphety, log = console }) {
-  /** Compañía del actor y cómo llamar a Saphety. El NIT se exige salvo al administrador viendo toda la cuenta. */
-  async function conexion(actor, { exigeNit = true } = {}) {
+  async function conexion(actor) {
     const compania = await companias.requerida(actor);
-    if (exigeNit && !String(compania.config.nit || '').replace(/\D/g, '')) {
+    if (!String(compania.config.nit || '').replace(/\D/g, '')) {
       throw fallo(400, 'Configura el NIT de la compañía en Administración para consultar sus documentos.');
     }
     const clave = await perfiles.clave(compania.id);
@@ -26,10 +22,10 @@ function crearServicioRecibidos({ companias, perfiles, saphety, log = console })
     return { compania, nit: compania.config.nit, llamar };
   }
 
-  /** Metadatos del documento: la compañía solo abre los suyos; el administrador, cualquiera de la cuenta. */
-  async function propio(actor, llamar, nit, id) {
+  /** Metadatos del documento, solo si la compañía es el adquiriente. */
+  async function propio(llamar, nit, id) {
     const d = await llamar('recibido', id);
-    if (!d || (!esAdmin(actor) && !reglas.esAdquiriente(d, nit))) throw fallo(404, 'Documento no encontrado para esta compañía.');
+    if (!d || !reglas.esAdquiriente(d, nit)) throw fallo(404, 'Documento no encontrado para esta compañía.');
     return d;
   }
 
@@ -45,33 +41,30 @@ function crearServicioRecibidos({ companias, perfiles, saphety, log = console })
     if (!otros.length) return [];
     const adquirientes = [...new Map(otros.map((d) => [d.DestinationCode, `${d.DestinationName || 'Sin nombre'} (${String(d.DestinationCode || '').split('_').pop()})`])).values()];
     const quienes = actor.rol === 'admin' ? `: ${adquirientes.slice(0, 5).join(', ')}${adquirientes.length > 5 ? '…' : ''}` : '';
-    return [`En estas fechas la cuenta de Saphety sí tiene documentos recibidos, pero son de otras empresas${quienes}. Esta compañía solo muestra los que llegan a su NIT ${nit}${actor.rol === 'admin' ? '; para verlos elige «Ver: Toda la cuenta de Saphety»' : ''}.`];
+    return [`En estas fechas la cuenta de Saphety sí tiene documentos recibidos, pero son de otras empresas${quienes}. Esta compañía solo muestra los que llegan a su NIT ${nit}.`];
   }
 
   return {
     async listar(actor, filtros = {}) {
-      const cuenta = filtros.alcance === 'cuenta';
-      if (cuenta && !esAdmin(actor)) throw fallo(403, 'Solo el administrador puede ver los documentos de toda la cuenta.');
-      const { compania, nit, llamar } = await conexion(actor, { exigeNit: !cuenta });
-      const { cuerpo, pagina, desde, hasta } = reglas.filtroBusqueda(filtros, compania.config, undefined, { cuenta });
+      const { compania, nit, llamar } = await conexion(actor);
+      const { cuerpo, pagina, desde, hasta } = reglas.filtroBusqueda(filtros, compania.config);
       const { Offset, NumberOfRecords, ...filtroConteo } = cuerpo; // eslint-disable-line no-unused-vars
       const [encontrados, total] = await Promise.all([
         llamar('buscarRecibidos', cuerpo),
         llamar('contarRecibidos', filtroConteo).catch((e) => { log.warn(`Conteo de recibidos: ${e.message}`); return null; }),
       ]);
-      const documentos = listaDocumentos(encontrados).filter((d) => cuenta || reglas.esAdquiriente(d, nit)).map(reglas.resumenRecibido);
-      const avisos = documentos.length || pagina || cuenta ? [] : await explicarVacio(actor, llamar, cuerpo, nit);
+      const documentos = listaDocumentos(encontrados).filter((d) => reglas.esAdquiriente(d, nit)).map(reglas.resumenRecibido);
+      const avisos = documentos.length || pagina ? [] : await explicarVacio(actor, llamar, cuerpo, nit);
       return {
-        compania: compania.nombre, alcance: cuenta ? 'cuenta' : 'compania', puedeVerCuenta: esAdmin(actor),
-        desde, hasta, pagina, tamanoPagina: TAMANO_PAGINA,
+        compania: compania.nombre, desde, hasta, pagina, tamanoPagina: TAMANO_PAGINA,
         total: documentos.length ? totalBusqueda(total, encontrados) : 0, hayMas: documentos.length >= TAMANO_PAGINA, documentos, avisos,
       };
     },
 
     async obtener(actor, id) {
       const docId = validarId(id);
-      const { compania, nit, llamar } = await conexion(actor, { exigeNit: !esAdmin(actor) });
-      const documento = reglas.resumenRecibido(await propio(actor, llamar, nit, docId));
+      const { compania, nit, llamar } = await conexion(actor);
+      const documento = reglas.resumenRecibido(await propio(llamar, nit, docId));
       const avisos = [];
       const respuestas = await llamar('respuestasRecibido', docId).catch((e) => { avisos.push(`No se pudieron consultar las respuestas: ${e.message}`); return null; });
       return {
@@ -88,8 +81,8 @@ function crearServicioRecibidos({ companias, perfiles, saphety, log = console })
       const docId = validarId(id);
       const f = FORMATOS[formato];
       if (!f) throw fallo(400, 'Formato inválido: usa pdf, xml o attached.');
-      const { nit, llamar } = await conexion(actor, { exigeNit: !esAdmin(actor) });
-      const d = await propio(actor, llamar, nit, docId);
+      const { nit, llamar } = await conexion(actor);
+      const d = await propio(llamar, nit, docId);
       const { contenido } = await llamar('archivoRecibido', docId, f.ruta);
       return { contenido, tipo: f.tipo, nombre: `${String(d.DocumentNumber || docId).replace(/[^\w.-]/g, '')}.${f.extension}` };
     },
@@ -101,12 +94,12 @@ function crearServicioRecibidos({ companias, perfiles, saphety, log = console })
     async registrarEvento(actor, id, { tipo, confirmado, ...datos } = {}) {
       const docId = validarId(id);
       const { ev, persona, motivo, concepto } = reglas.datosEvento(tipo, datos);
-      const { compania, nit, llamar } = await conexion(actor, { exigeNit: !esAdmin(actor) });
+      const { compania, nit, llamar } = await conexion(actor);
       if (compania.config.modoEnvio !== 'real') {
         throw fallo(400, 'La compañía está en modo simulado: los eventos RADIAN no se envían. Cámbiala a modo real en Administración.');
       }
       if (confirmado !== true) throw fallo(400, `Confirma el evento «${ev.nombre}»: se envía a la DIAN y no se puede deshacer.`);
-      const d = await propio(actor, llamar, nit, docId);
+      const d = await propio(llamar, nit, docId);
       if (!ev.desde.includes(d.DocumentStatus)) {
         throw fallo(409, `«${ev.nombre}» no corresponde al estado actual del documento (${reglas.resumenRecibido(d).estadoTexto}).`);
       }

@@ -10,7 +10,6 @@ const http = require('node:http');
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ds-recibidos-'));
 const { app } = require('../src/server');
 const reglas = require('../src/dominio/recibidos');
-const { crearServicioRecibidos } = require('../src/servicios/recibidos.servicio');
 
 const ID_PROPIO = '5d1c2a10-9b7e-4c3a-8f21-0a1b2c3d4e5f';
 const ID_AJENO = '6e2d3b21-ac8f-4d4b-9032-1b2c3d4e5f60';
@@ -107,11 +106,9 @@ test('recibidos: lista, detalle, archivos y eventos solo de la compañía', asyn
     assert.strictEqual(pdf.cuerpo.toString(), '%PDF-1.4 recibido');
     assert.strictEqual((await llamar(`/api/recibidos/${ID_PROPIO}/xml`)).cuerpo.toString(), '<Invoice/>');
 
-    // El administrador puede ver toda la cuenta de Saphety, con el adquiriente de cada documento
-    const cuenta = await json('/api/recibidos?alcance=cuenta');
-    assert.deepStrictEqual(cuenta.datos.documentos.map((d) => d.numero), ['FE100', 'X1']);
-    assert.deepStrictEqual([cuenta.datos.alcance, cuenta.datos.puedeVerCuenta], ['cuenta', true]);
-    assert.ok(!('CompanyIds' in llamadas.filter((l) => l.url.endsWith('/search')).pop().cuerpo));
+    // Documento de otra compañía
+    assert.strictEqual((await json(`/api/recibidos/${ID_AJENO}`)).status, 404);
+    assert.strictEqual((await llamar(`/api/recibidos/${ID_AJENO}/pdf`)).status, 404);
 
     // En modo simulado ningún evento sale a Saphety
     const simulado = await enviarEvento(ID_PROPIO, { tipo: 'acuse', confirmado: true, persona });
@@ -122,6 +119,7 @@ test('recibidos: lista, detalle, archivos y eventos solo de la compañía', asyn
     // Sin confirmación, con el evento que no corresponde o sobre un documento ajeno: no se envía
     assert.match((await enviarEvento(ID_PROPIO, { tipo: 'acuse', persona })).datos.error, /Confirma/);
     assert.strictEqual((await enviarEvento(ID_PROPIO, { tipo: 'aceptar', confirmado: true })).status, 409);
+    assert.strictEqual((await enviarEvento(ID_AJENO, { tipo: 'acuse', confirmado: true, persona })).status, 404);
     assert.ok(!llamadas.some((l) => l.metodo === 'POST' && /receive|accept|reject|goodsreceived/.test(l.url)));
 
     const acuse = await enviarEvento(ID_PROPIO, { tipo: 'acuse', confirmado: true, persona });
@@ -135,26 +133,4 @@ test('recibidos: lista, detalle, archivos y eventos solo de la compañía', asyn
     sApp.close();
     sMock.close();
   }
-});
-
-test('recibidos: una compañía solo ve lo suyo y no puede ver toda la cuenta', async () => {
-  const compania = { id: 7, nombre: 'Vitro', config: { nit: '860031699', companyId: 'c-vitro', modoEnvio: 'real' } };
-  const busquedas = [];
-  const saphety = {
-    buscarRecibidos: async (id, cfg, clave, filtro) => { busquedas.push(filtro); return { Items: [doc(ID_PROPIO, 'FE100', 'CO_NIT_860031699'), doc(ID_AJENO, 'X1', 'CO_NIT_900111222')] }; },
-    contarRecibidos: async () => 2,
-    recibido: async (id, cfg, clave, docId) => (docId === ID_PROPIO ? doc(ID_PROPIO, 'FE100', 'CO_NIT_860031699') : doc(ID_AJENO, 'X1', 'CO_NIT_900111222')),
-    acuseRecibo: async () => { throw new Error('no debe enviarse'); },
-  };
-  const servicio = crearServicioRecibidos({ companias: { requerida: async () => compania }, perfiles: { clave: async () => 'x' }, saphety, log: { warn() {}, info() {} } });
-  const empresa = { id: 2, rol: 'empresa', perfilId: 7 };
-
-  const lista = await servicio.listar(empresa, {});
-  assert.deepStrictEqual(lista.documentos.map((d) => d.numero), ['FE100']);
-  assert.strictEqual(lista.puedeVerCuenta, false);
-  assert.deepStrictEqual(busquedas[0].CompanyIds, ['c-vitro']);
-  await assert.rejects(servicio.listar(empresa, { alcance: 'cuenta' }), (e) => e.status === 403);
-  await assert.rejects(servicio.obtener(empresa, ID_AJENO), (e) => e.status === 404);
-  await assert.rejects(servicio.archivo(empresa, ID_AJENO, 'pdf'), (e) => e.status === 404);
-  await assert.rejects(servicio.registrarEvento(empresa, ID_AJENO, { tipo: 'acuse', confirmado: true, persona: { nombre: 'A', apellido: 'B', documento: '1' } }), (e) => e.status === 404);
 });

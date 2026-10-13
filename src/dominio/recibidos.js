@@ -34,11 +34,8 @@ const CONCEPTOS_RECLAMO = {
 
 const ESTADO_FILTRO = { pendientes: ['Registered', 'Received', 'GoodsOrServicesReceived'], aceptados: ['Accepted', 'TacitlyAccepted'], rechazados: ['Rejected'] };
 
-/**
- * Cuerpo de inbounddocuments/search: documentos en los que la compañía es el adquiriente,
- * o todos los de la cuenta de Saphety si cuenta = true (solo el administrador).
- */
-function filtroBusqueda({ desde, hasta, numero, proveedor, estado, pagina } = {}, cfg, ahora = new Date(), { cuenta = false } = {}) {
+/** Cuerpo de inbounddocuments/search: documentos en los que la compañía es el adquiriente. */
+function filtroBusqueda({ desde, hasta, numero, proveedor, estado, pagina } = {}, cfg, ahora = new Date()) {
   const r = rangoFechas(desde, hasta, ahora);
   const p = numeroPagina(pagina);
   const cuerpo = {
@@ -48,7 +45,7 @@ function filtroBusqueda({ desde, hasta, numero, proveedor, estado, pagina } = {}
     Offset: p,
     NumberOfRecords: TAMANO_PAGINA,
   };
-  if (cfg.companyId && !cuenta) cuerpo.CompanyIds = [cfg.companyId];
+  if (cfg.companyId) cuerpo.CompanyIds = [cfg.companyId];
   const n = String(numero || '').trim().toUpperCase();
   if (n) cuerpo.DocumentNumber = n;
   const nitProveedor = soloDigitos(proveedor);

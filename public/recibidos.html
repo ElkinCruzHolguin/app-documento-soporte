@@ -32,7 +32,6 @@
   <section class="panel">
     <h2>Filtros</h2>
     <form class="filtros" id="filtros">
-      <div class="oculto" id="campoAlcance"><label for="alcance">Ver</label><select id="alcance"><option value="">Esta compañía</option><option value="cuenta">Toda la cuenta de Saphety</option></select></div>
       <div><label for="desde">Desde</label><input type="date" id="desde"></div>
       <div><label for="hasta">Hasta</label><input type="date" id="hasta"></div>
       <div><label for="numero">Número (prefijo + consecutivo)</label><input id="numero" placeholder="Ej. FE218128"></div>
@@ -47,7 +46,7 @@
     <div id="msg"></div>
     <div class="tabla-scroll">
       <table>
-        <thead><tr><th>Recibido</th><th>Tipo / Número</th><th>Proveedor</th><th class="col-adquiriente oculto">Adquiriente</th><th class="num">IVA</th><th class="num">Valor</th><th>Estado</th><th>Siguiente paso</th></tr></thead>
+        <thead><tr><th>Recibido</th><th>Tipo / Número</th><th>Proveedor</th><th class="num">IVA</th><th class="num">Valor</th><th>Estado</th><th>Siguiente paso</th></tr></thead>
         <tbody id="filas"></tbody>
       </table>
     </div>
@@ -70,7 +69,7 @@ async function cargar() {
   const msg = document.getElementById('msg');
   const filas = document.getElementById('filas');
   const q = new URLSearchParams({ pagina });
-  for (const id of ['alcance', 'desde', 'hasta', 'numero', 'proveedor', 'estado']) {
+  for (const id of ['desde', 'hasta', 'numero', 'proveedor', 'estado']) {
     const v = document.getElementById(id).value.trim();
     if (v) q.set(id, v);
   }
@@ -80,10 +79,7 @@ async function cargar() {
     const r = await api(`/api/recibidos?${q}`);
     document.getElementById('desde').value = r.desde;
     document.getElementById('hasta').value = r.hasta;
-    const deCuenta = r.alcance === 'cuenta';
-    document.getElementById('campoAlcance').classList.toggle('oculto', !r.puedeVerCuenta);
-    document.querySelectorAll('.col-adquiriente').forEach((c) => c.classList.toggle('oculto', !deCuenta));
-    document.getElementById('antetitulo').textContent = `Documentos recibidos · ${deCuenta ? 'toda la cuenta de Saphety' : r.compania}`;
+    document.getElementById('antetitulo').textContent = `Documentos recibidos · ${r.compania}`;
     const docs = r.documentos;
     const cuenta = (e) => docs.filter((d) => d.estado === e).length;
     document.getElementById('mTotal').textContent = r.total != null ? r.total.toLocaleString('es-CO') : docs.length;
@@ -97,7 +93,6 @@ async function cargar() {
       <td>${esc(fecha(d.fechaCreacion))}</td>
       <td><div class="ayuda" style="margin:0">${esc(d.tipo)}</div><a class="enlace-doc" href="recibido.html?id=${encodeURIComponent(d.id)}">${esc(d.numero)}</a></td>
       <td>${esc(d.proveedor)}<div class="codigo">${esc(d.proveedorCodigo)}</div></td>
-      ${deCuenta ? `<td>${esc(d.compania)}<div class="codigo">${esc(d.companiaCodigo)}</div></td>` : ''}
       <td class="num">${pesos(d.iva)}</td>
       <td class="num">${d.moneda !== 'COP' ? esc(d.moneda) + ' ' : ''}${pesos(d.valor)}</td>
       <td><span class="chip ${esc(d.estado)}">${esc(d.estadoTexto)}</span></td>
