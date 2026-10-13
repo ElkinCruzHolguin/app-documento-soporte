@@ -129,5 +129,5 @@ function datosEvento(tipo, { persona = {}, motivo, concepto } = {}) {
 }
 
 module.exports = {
-  TIPOS_DOCUMENTO, EVENTOS, CONCEPTOS_RECLAMO, filtroBusqueda, esDeLaEmpresa, eventosPermitidos, resumenRecibido, datosEvento,
+  TIPOS_DOCUMENTO, EVENTOS, CONCEPTOS_RECLAMO, ESTADO_FILTRO, filtroBusqueda, esDeLaEmpresa, eventosPermitidos, resumenRecibido, datosEvento,
 };

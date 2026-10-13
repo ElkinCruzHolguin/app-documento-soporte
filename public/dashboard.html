@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard</title>
+<link rel="stylesheet" href="app.css">
+<script src="comun.js"></script>
+</head>
+<body>
+<header>
+  <h1>Documentos soporte · Saphety</h1>
+  <nav id="menu" data-activo="dashboard.html"></nav>
+  <div id="banner"></div>
+</header>
+<main>
+  <div class="encabezado">
+    <div>
+      <p class="antetitulo" id="antetitulo">Colombia</p>
+      <h1>Centro de operaciones</h1>
+      <p class="ayuda">Emisión, recepción y estado ante la DIAN de la compañía, consultados en línea en Saphety.</p>
+    </div>
+    <div class="fila-botones" style="margin:0">
+      <a class="boton secundario" href="https://catalogo-vpfe.dian.gov.co/User/SearchDocument" target="_blank" rel="noreferrer">Consultar en la DIAN</a>
+      <a class="boton" href="index.html">Cargar documentos</a>
+    </div>
+  </div>
+  <div id="msg"><div class="aviso warn">Consultando Saphety…</div></div>
+
+  <div class="metricas tablero-kpi">
+    <article class="metrica"><p class="etiqueta">Valor del mes</p><p class="valor" id="kValor">—</p><p class="nota" id="kValorNota"></p></article>
+    <article class="metrica"><p class="etiqueta">Documentos hoy</p><p class="valor" id="kHoy">—</p><p class="nota" id="kHoyNota"></p></article>
+    <article class="metrica"><p class="etiqueta">Aceptados por la DIAN</p><p class="valor ok" id="kAceptados">—</p><p class="nota" id="kAceptadosNota"></p></article>
+    <article class="metrica"><p class="etiqueta">Rechazados</p><p class="valor err" id="kRechazados">—</p><p class="nota" id="kRechazadosNota"></p></article>
+  </div>
+
+  <div class="tablero">
+    <section class="panel">
+      <div class="cabeza-panel">
+        <div><h2>Volumen documental</h2><p>Emitidos y recibidos por día, últimos 7 días</p></div>
+        <div class="leyenda"><span style="--c:var(--serie-emitidos)">Emitidos</span><span style="--c:var(--serie-recibidos)">Recibidos</span></div>
+      </div>
+      <div class="grafica" id="grafica"></div>
+      <details style="margin-top:8px"><summary class="ayuda" style="cursor:pointer">Ver como tabla</summary><div class="tabla-scroll" style="margin-top:8px"><table><thead><tr><th>Día</th><th class="num">Emitidos</th><th class="num">Recibidos</th></tr></thead><tbody id="tablaSerie"></tbody></table></div></details>
+    </section>
+    <section class="panel">
+      <div class="cabeza-panel"><div><h2>Estado DIAN</h2><p id="estadoNota">Documentos emitidos en el mes</p></div></div>
+      <div class="barras" id="barras"></div>
+    </section>
+  </div>
+
+  <div class="tablero">
+    <section class="panel">
+      <div class="cabeza-panel"><div><h2>Emisión reciente</h2><p>Últimos documentos y su respuesta de la DIAN</p></div><a href="emitidos.html" class="enlace-doc">Ver todos</a></div>
+      <div class="tabla-scroll">
+        <table>
+          <thead><tr><th>Documento</th><th>Proveedor</th><th>Creado</th><th class="num">Valor</th><th>DIAN</th></tr></thead>
+          <tbody id="recientes"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="cabeza-panel"><div><h2>Centro de atención</h2><p>Lo que necesita gestión</p></div></div>
+      <div class="atencion" id="atencion"></div>
+      <h2 style="margin:20px 0 12px">Envíos desde la app</h2>
+      <ul class="actividad" id="actividad"></ul>
+    </section>
+  </div>
+</main>
+
+<script>
+const fechaHora = (iso) => (iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }) : '');
+const entero = (n) => (n == null ? '—' : Number(n).toLocaleString('es-CO'));
+const dinero = (n) => `$ ${Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
+const diaCorto = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const NS = 'http://www.w3.org/2000/svg';
+let datos = null;
+
+/** Gráfica de líneas en SVG: una escala, rejilla tenue, etiqueta al final de cada serie y guía con detalle al pasar el cursor. */
+function pintarGrafica() {
+  const cont = document.getElementById('grafica');
+  const serie = datos.serie;
+  const lineas = [
+    { clave: 'emitidos', nombre: 'Emitidos', color: 'var(--serie-emitidos)' },
+    { clave: 'recibidos', nombre: 'Recibidos', color: 'var(--serie-recibidos)' },
+  ].filter((l) => serie.some((p) => p[l.clave] != null));
+  const ancho = Math.max(cont.clientWidth, 280), alto = 260, m = { t: 12, r: 72, b: 28, l: 36 };
+  const max = Math.max(1, ...serie.flatMap((p) => lineas.map((l) => p[l.clave] || 0)));
+  const paso = Math.max(1, Math.ceil(max / 4));
+  const tope = paso * 4;
+  const x = (i) => m.l + (i * (ancho - m.l - m.r)) / (serie.length - 1);
+  const y = (v) => m.t + (1 - v / tope) * (alto - m.t - m.b);
+  let svg = `<svg viewBox="0 0 ${ancho} ${alto}" role="img" aria-label="Documentos emitidos y recibidos por día">`;
+  for (let v = 0; v <= tope; v += paso) svg += `<line class="rejilla" x1="${m.l}" x2="${ancho - m.r}" y1="${y(v)}" y2="${y(v)}"/><text class="eje" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${entero(v)}</text>`;
+  // En pantallas angostas se rotula un día sí y otro no (siempre el último) para que no se encimen.
+  const salto = ancho < 520 ? 2 : 1;
+  serie.forEach((p, i) => { if ((serie.length - 1 - i) % salto === 0) svg += `<text class="eje" x="${x(i)}" y="${alto - 8}" text-anchor="middle">${esc(diaCorto(p.dia))}</text>`; });
+  for (const l of lineas) {
+    svg += `<path class="linea" style="stroke:${l.color}" d="${serie.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p[l.clave] || 0)}`).join(' ')}"/>`;
+    const u = serie.length - 1;
+    svg += `<circle class="punto" cx="${x(u)}" cy="${y(serie[u][l.clave] || 0)}" r="4" style="fill:${l.color}"/>`;
+  }
+  // Etiquetas directas al final, separadas si quedan encima una de otra.
+  const finales = lineas.map((l) => ({ l, yy: y(serie[serie.length - 1][l.clave] || 0) })).sort((a, b) => a.yy - b.yy);
+  for (let i = 1; i < finales.length; i += 1) if (finales[i].yy - finales[i - 1].yy < 14) finales[i].yy = finales[i - 1].yy + 14;
+  for (const f of finales) svg += `<text class="etiqueta-serie" x="${ancho - m.r + 10}" y="${f.yy + 4}">${esc(f.l.nombre)}</text>`;
+  svg += `<line class="guia" id="guia" y1="${m.t}" y2="${alto - m.b}" visibility="hidden"/><rect id="zona" x="${m.l}" y="0" width="${ancho - m.l - m.r}" height="${alto}" fill="transparent"/></svg><div class="tooltip-grafica oculto" id="tip"></div>`;
+  cont.innerHTML = svg;
+  const zona = cont.querySelector('#zona'), guia = cont.querySelector('#guia'), tip = cont.querySelector('#tip');
+  const mostrar = (ev) => {
+    const r = cont.querySelector('svg').getBoundingClientRect();
+    const px = ((ev.clientX - r.left) / r.width) * ancho;
+    const i = Math.max(0, Math.min(serie.length - 1, Math.round(((px - m.l) / (ancho - m.l - m.r)) * (serie.length - 1))));
+    guia.setAttribute('x1', x(i)); guia.setAttribute('x2', x(i)); guia.setAttribute('visibility', 'visible');
+    tip.innerHTML = `<b>${esc(diaCorto(serie[i].dia))}</b>${lineas.map((l) => `<div><i style="--c:${l.color}"></i>${esc(l.nombre)}: ${entero(serie[i][l.clave])}</div>`).join('')}`;
+    tip.style.left = `${(x(i) / ancho) * r.width}px`;
+    tip.style.top = `${(m.t / alto) * r.height + 4}px`;
+    tip.classList.remove('oculto');
+  };
+  zona.addEventListener('pointermove', mostrar);
+  zona.addEventListener('pointerleave', () => { guia.setAttribute('visibility', 'hidden'); tip.classList.add('oculto'); });
+  document.getElementById('tablaSerie').innerHTML = serie.map((p) => `<tr><td>${esc(diaCorto(p.dia))}</td><td class="num">${entero(p.emitidos)}</td><td class="num">${entero(p.recibidos)}</td></tr>`).join('');
+}
+
+function pintarEstados(e) {
+  const cont = document.getElementById('barras');
+  if (!e.disponible) { cont.innerHTML = `<p class="ayuda">${esc(e.error)}</p>`; return; }
+  const filas = [
+    { texto: 'Aceptados', v: e.porEstado.aceptado, c: 'var(--ok)' },
+    { texto: 'En proceso', v: e.porEstado.en_proceso, c: 'var(--info)' },
+    { texto: 'Rechazados', v: e.porEstado.rechazado, c: 'var(--err)' },
+  ];
+  const total = filas.reduce((s, f) => s + f.v, 0);
+  cont.innerHTML = filas.map((f) => `<div class="barra"><div class="fila"><span>${f.texto}</span><b>${entero(f.v)}</b></div>
+    <div class="pista"><div class="relleno" style="--c:${f.c};width:${total ? (f.v / total) * 100 : 0}%"></div></div></div>`).join('')
+    + (total ? '' : '<p class="ayuda">Aún no hay documentos emitidos este mes.</p>');
+  if (!e.completo) document.getElementById('estadoNota').textContent = `Sobre los ${entero(e.listadosMes)} documentos emitidos más recientes del mes`;
+}
+
+function pintarIndicadores() {
+  const { emitidos: e, recibidos: r } = datos;
+  if (e.disponible) {
+    document.getElementById('kValor').textContent = dinero(e.valorMes);
+    const totalMes = e.totalMes ?? e.listadosMes;
+    document.getElementById('kValorNota').textContent = `COP · ${entero(totalMes)} documentos soporte${e.totalMesAnterior != null ? ` · ${entero(e.totalMesAnterior)} el mes anterior` : ''}${e.completo ? '' : ` · valor de los ${entero(e.listadosMes)} más recientes`}`;
+    document.getElementById('kAceptados').textContent = entero(e.porEstado.aceptado);
+    document.getElementById('kAceptadosNota').textContent = e.tasaAceptacion == null ? 'Sin documentos este mes' : `${(e.tasaAceptacion * 100).toLocaleString('es-CO', { maximumFractionDigits: 1 })}% de los emitidos del mes`;
+    document.getElementById('kRechazados').textContent = entero(e.porEstado.rechazado);
+    document.getElementById('kRechazadosNota').textContent = `${entero(e.porEstado.en_proceso)} en proceso · emitidos del mes`;
+  } else {
+    for (const id of ['kValorNota', 'kAceptadosNota', 'kRechazadosNota']) document.getElementById(id).textContent = 'Emitidos no disponibles';
+  }
+  const hoyE = e.disponible ? e.hoy : null, hoyR = r.disponible ? r.hoy : null;
+  document.getElementById('kHoy').textContent = entero((hoyE || 0) + (hoyR || 0));
+  document.getElementById('kHoyNota').textContent = `${entero(hoyE)} emitidos · ${entero(hoyR)} recibidos`;
+}
+
+function pintarRecientes(e) {
+  const cuerpo = document.getElementById('recientes');
+  if (!e.disponible) { cuerpo.innerHTML = `<tr><td colspan="5" class="ayuda">${esc(e.error)}</td></tr>`; return; }
+  if (!e.recientes.length) { cuerpo.innerHTML = '<tr><td colspan="5" class="ayuda">No hay documentos emitidos en los últimos días.</td></tr>'; return; }
+  cuerpo.innerHTML = e.recientes.map((d) => `<tr>
+    <td><a class="enlace-doc" href="documento.html?id=${encodeURIComponent(d.id)}">${esc(d.numero)}</a><div class="ayuda" style="margin:0">${esc(d.tipo)}</div></td>
+    <td>${esc(d.proveedor)}<div class="codigo">${esc(d.proveedorCodigo)}</div></td>
+    <td>${esc(fechaHora(d.fechaCreacion))}</td>
+    <td class="num">${d.moneda !== 'COP' ? esc(d.moneda) + ' ' : ''}${pesos(d.valor)}</td>
+    <td>${chip(d.estado)}</td></tr>`).join('');
+}
+
+function pintarAtencion() {
+  const { emitidos: e, recibidos: r } = datos;
+  const items = [];
+  if (e.disponible && e.porEstado.rechazado) {
+    items.push(`<div class="item err"><h3>${entero(e.porEstado.rechazado)} documentos rechazados este mes</h3><p>Revisa el motivo de la DIAN en el detalle de cada documento.</p><a href="emitidos.html">Ver emitidos</a></div>`);
+  }
+  if (r.disponible) {
+    items.push(r.porGestionar
+      ? `<div class="item warn"><h3>${entero(r.porGestionar)} recibidos por gestionar</h3><p>Facturas de proveedores sin aceptación ni reclamo en el último año.</p><a href="recibidos.html">Ir a Recibidos</a></div>`
+      : '<div class="item"><h3>Recibidos al día</h3><p>No hay facturas de proveedores pendientes de gestionar en el último año.</p></div>');
+  }
+  for (const [nombre, s] of [['Emitidos', e], ['Recibidos', r]]) {
+    if (!s.disponible) items.push(`<div class="item"><h3>${nombre} no disponibles</h3><p>${esc(s.error)}</p><a href="admin.html">Ir a Administración</a></div>`);
+  }
+  if (e.disponible && !e.porEstado.rechazado && r.disponible) items.unshift('<div class="item"><h3>Sin rechazos este mes</h3><p>Todos los documentos emitidos del mes están aceptados o en proceso.</p></div>');
+  document.getElementById('atencion').innerHTML = items.join('');
+  document.getElementById('actividad').innerHTML = datos.envios.length
+    ? datos.envios.map((v) => `<li>${chip(v.estado)} <b>${esc(v.numero || v.numeroExcel || '')}</b> · ${esc(v.proveedor || '')}<small>${esc(fechaHora(v.creadoEn))}</small></li>`).join('')
+    : '<li class="ayuda">Aún no hay envíos reales desde la app para esta compañía.</li>';
+}
+
+async function cargar() {
+  const msg = document.getElementById('msg');
+  try {
+    datos = await api('/api/dashboard');
+    document.getElementById('antetitulo').textContent = `Colombia · ${datos.compania} · ${diaCorto(datos.mes.desde)} a ${diaCorto(datos.hoy)}`;
+    pintarIndicadores();
+    pintarGrafica();
+    pintarEstados(datos.emitidos);
+    pintarRecientes(datos.emitidos);
+    pintarAtencion();
+    msg.innerHTML = '';
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err">${esc(e.message)}</div>`;
+  }
+}
+let espera;
+window.addEventListener('resize', () => { clearTimeout(espera); espera = setTimeout(() => datos && pintarGrafica(), 150); });
+cargar();
+</script>
+</body>
+</html>
