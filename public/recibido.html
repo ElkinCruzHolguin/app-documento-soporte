@@ -101,7 +101,7 @@ function abrirEvento(tipo) {
   eventoActual = tipo;
   const ev = info.eventos[tipo];
   document.getElementById('dlgTitulo').textContent = `${ev.codigo} · ${ev.nombre} · ${info.documento.numero}`;
-  document.getElementById('dlgAviso').textContent = `Vas a registrar «${ev.nombre}» para ${info.documento.numero} de ${info.documento.proveedor}. Se envía a la DIAN y al proveedor y no se puede deshacer.`;
+  document.getElementById('dlgAviso').textContent = `Vas a registrar «${ev.nombre}» para ${info.documento.numero} de ${info.documento.proveedor}, recibido por ${info.documento.compania} (${info.documento.companiaCodigo}). Se envía a la DIAN y al proveedor y no se puede deshacer.`;
   document.getElementById('camposPersona').classList.toggle('oculto', !ev.conPersona);
   document.getElementById('camposReclamo').classList.toggle('oculto', tipo !== 'rechazar');
   document.getElementById('camposMotivo').classList.toggle('oculto', !!ev.conPersona);

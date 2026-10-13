@@ -3,8 +3,8 @@
 function crearControladorRecibidos({ recibidos }) {
   return {
     async listar(req, res) {
-      const { desde, hasta, numero, proveedor, estado, pagina } = req.query;
-      res.json(await recibidos.listar(req.usuario, { desde, hasta, numero, proveedor, estado, pagina }));
+      const { desde, hasta, numero, proveedor, estado, pagina, alcance } = req.query;
+      res.json(await recibidos.listar(req.usuario, { desde, hasta, numero, proveedor, estado, pagina, alcance }));
     },
     async obtener(req, res) {
       res.json(await recibidos.obtener(req.usuario, req.params.id));
