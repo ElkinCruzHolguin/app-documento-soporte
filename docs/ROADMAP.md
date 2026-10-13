@@ -12,13 +12,13 @@ Responsable sugerido: **A** = Elkin, **B** = compañero. La división es por ár
 | Administración: compañías y usuarios | Configuración | `auth/gettoken` | En producción |
 | Diseño DIAN Connect Hub | Todas | — | En producción |
 | Emitidos y detalle (PDF, XML, respuestas DIAN) | Documentos emitidos | `outbounddocuments/search`, `count`, `{id}`, `status`, `applicationresponses`, `{formato}/content` | En producción, falta validar contra QA real |
+| Dashboard: indicadores del mes, volumen de 7 días, estado DIAN, emisión reciente, centro de atención | Dashboard | `contarEmitidos`, `buscarEmitidos`, `contarRecibidos`, `buscarRecibidos`, historial | En PR |
 | Recibidos y eventos RADIAN (030, 032, 033, 031) | Documentos recibidos | `inbounddocuments/search`, `count`, `{id}`, `pdf`, `ubl`, `attacheddocument`, `applicationresponses`, `receive`, `goodsreceived`, `accept`, `reject` | En este PR, falta validar contra QA real |
 
 ## Siguiente
 | Issue | Funcionalidad | Vista del Lovable | Funciones del cliente (`saphety.*`) | Resp. |
 |---|---|---|---|---|
 | [#6](https://github.com/ElkinCruzHolguin/app-documento-soporte/issues/6) | Validar Emitidos y Recibidos contra QA real (paginación `Offset`, forma de `ResultData`) | — | `buscarEmitidos`, `buscarRecibidos` | A |
-| [#7](https://github.com/ElkinCruzHolguin/app-documento-soporte/issues/7) | Dashboard: totales del mes, por estado, emitidos vs recibidos, pendientes por gestionar | Dashboard | `contarEmitidos`, `contarRecibidos`, `buscar*` | B |
 | [#8](https://github.com/ElkinCruzHolguin/app-documento-soporte/issues/8) | Series y numeración desde Saphety (consultar, crear, editar) | Configuración → Series | `listarSeries`, `seriesPorTipo`, `serie`, `crearSerie`, `actualizarSerie` | A |
 | [#9](https://github.com/ElkinCruzHolguin/app-documento-soporte/issues/9) | Trazabilidad: línea de tiempo de cada documento (creado, validado DIAN, correo, eventos) | Trazabilidad | `estadoEmitido`, `respuestasEmitido`, `respuestasRecibido`, `sincronizarRecibido` | B |
 | [#10](https://github.com/ElkinCruzHolguin/app-documento-soporte/issues/10) | Reenviar correo del documento | Detalle de emitido | `enviarCorreo` | B |

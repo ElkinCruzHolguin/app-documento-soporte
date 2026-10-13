@@ -3,6 +3,7 @@
 // Menú lateral: una sola lista para todas las páginas. Para agregar una página nueva basta con sumarla aquí
 // y poner <nav id="menu" data-activo="mi-pagina.html"></nav> en su HTML.
 const MENU = [
+  { href: 'dashboard.html', texto: 'Dashboard' },
   { href: 'index.html', texto: 'Cargar y enviar' },
   { href: 'emitidos.html', texto: 'Emitidos' },
   { href: 'recibidos.html', texto: 'Recibidos' },
