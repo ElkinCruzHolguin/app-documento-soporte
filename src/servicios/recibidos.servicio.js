@@ -29,6 +29,21 @@ function crearServicioRecibidos({ companias, perfiles, saphety, log = console })
     return d;
   }
 
+  /**
+   * Sin resultados: mira si en el mismo rango la cuenta de Saphety tiene documentos de otras empresas,
+   * para que se entienda por qué la lista sale vacía. Los nombres de esas empresas solo los ve el administrador.
+   */
+  async function explicarVacio(actor, llamar, cuerpo, nit) {
+    const { DocumentTypes, CreationDateStart, CreationDateEnd } = cuerpo;
+    const otros = await llamar('buscarRecibidos', { DocumentTypes, CreationDateStart, CreationDateEnd, Offset: 0, NumberOfRecords: TAMANO_PAGINA })
+      .then((r) => listaDocumentos(r).filter((d) => !reglas.esAdquiriente(d, nit)))
+      .catch(() => []);
+    if (!otros.length) return [];
+    const adquirientes = [...new Map(otros.map((d) => [d.DestinationCode, `${d.DestinationName || 'Sin nombre'} (${String(d.DestinationCode || '').split('_').pop()})`])).values()];
+    const quienes = actor.rol === 'admin' ? `: ${adquirientes.slice(0, 5).join(', ')}${adquirientes.length > 5 ? '…' : ''}` : '';
+    return [`En estas fechas la cuenta de Saphety sí tiene documentos recibidos, pero son de otras empresas${quienes}. Esta compañía solo muestra los que llegan a su NIT ${nit}.`];
+  }
+
   return {
     async listar(actor, filtros = {}) {
       const { compania, nit, llamar } = await conexion(actor);
@@ -39,9 +54,10 @@ function crearServicioRecibidos({ companias, perfiles, saphety, log = console })
         llamar('contarRecibidos', filtroConteo).catch((e) => { log.warn(`Conteo de recibidos: ${e.message}`); return null; }),
       ]);
       const documentos = listaDocumentos(encontrados).filter((d) => reglas.esAdquiriente(d, nit)).map(reglas.resumenRecibido);
+      const avisos = documentos.length || pagina ? [] : await explicarVacio(actor, llamar, cuerpo, nit);
       return {
         compania: compania.nombre, desde, hasta, pagina, tamanoPagina: TAMANO_PAGINA,
-        total: totalBusqueda(total, encontrados), hayMas: documentos.length >= TAMANO_PAGINA, documentos,
+        total: documentos.length ? totalBusqueda(total, encontrados) : 0, hayMas: documentos.length >= TAMANO_PAGINA, documentos, avisos,
       };
     },
 

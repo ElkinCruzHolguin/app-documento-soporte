@@ -54,6 +54,7 @@ test('recibidos: lista, detalle, archivos y eventos solo de la compañía', asyn
       if (req.url === '/v2/auth/gettoken') return ok({ access_token: 'tok', expires: new Date(Date.now() + 3600e3).toISOString() });
       llamadas.push({ metodo: req.method, url: req.url, cuerpo: cuerpo && JSON.parse(cuerpo) });
       const base = '/v2/jtc/inbounddocuments';
+      if (req.url === `${base}/search` && JSON.parse(cuerpo).DocumentNumber === 'NADA') return ok({ Items: [doc(ID_AJENO, 'X1', 'CO_NIT_900111222')], Total: 1 });
       if (req.url === `${base}/search`) return ok({ Items: [doc(ID_PROPIO, 'FE100', 'CO_NIT_860031699', estado), doc(ID_AJENO, 'X1', 'CO_NIT_900111222')], Total: 2 });
       if (req.url === `${base}/count`) return json({ IsValid: false, Errors: [{ Code: 'Boom' }] }, 500);
       if (req.url === `${base}/${ID_PROPIO}`) return ok(doc(ID_PROPIO, 'FE100', 'CO_NIT_860031699', estado));
@@ -87,6 +88,11 @@ test('recibidos: lista, detalle, archivos y eventos solo de la compañía', asyn
     assert.strictEqual(lista.status, 200, JSON.stringify(lista.datos));
     assert.deepStrictEqual(lista.datos.documentos.map((d) => [d.numero, d.estadoTexto, d.eventos]), [['FE100', 'Recibido en buzón', ['acuse']]]);
     assert.strictEqual(lista.datos.total, 2);
+
+    // Sin documentos propios se explica que los que hay en la cuenta son de otras empresas
+    const vacia = await json('/api/recibidos?numero=nada');
+    assert.deepStrictEqual([vacia.datos.documentos.length, vacia.datos.total], [0, 0]);
+    assert.match(vacia.datos.avisos[0], /otras empresas: Vitro \(900111222\)/);
 
     const detalle = await json(`/api/recibidos/${ID_PROPIO}`);
     assert.strictEqual(detalle.status, 200, JSON.stringify(detalle.datos));

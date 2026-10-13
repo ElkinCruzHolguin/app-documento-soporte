@@ -87,7 +87,8 @@ async function cargar() {
     document.getElementById('mPendientes').textContent = docs.filter((d) => d.eventos.length).length;
     document.getElementById('mAceptados').textContent = cuenta('aceptado');
     document.getElementById('mValor').textContent = `$ ${docs.reduce((s, d) => s + (d.moneda === 'COP' ? Number(d.valor) || 0 : 0), 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
-    msg.innerHTML = docs.length ? '' : '<div class="aviso warn">No hay documentos recibidos con esos filtros.</div>';
+    msg.innerHTML = docs.length ? '' : [`No hay documentos recibidos entre ${esc(r.desde)} y ${esc(r.hasta)} con esos filtros. Puedes consultar hasta un año hacia atrás cambiando «Desde».`, ...(r.avisos || []).map(esc)]
+      .map((a) => `<div class="aviso warn">${a}</div>`).join('');
     filas.innerHTML = docs.map((d) => `<tr class="clic" data-id="${esc(d.id)}">
       <td>${esc(fecha(d.fechaCreacion))}</td>
       <td><div class="ayuda" style="margin:0">${esc(d.tipo)}</div><a class="enlace-doc" href="recibido.html?id=${encodeURIComponent(d.id)}">${esc(d.numero)}</a></td>
