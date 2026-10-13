@@ -43,7 +43,7 @@ function crearServicioEmitidos({ companias, perfiles, saphety, log = console }) 
         hasta,
         pagina,
         tamanoPagina: reglas.TAMANO_PAGINA,
-        total: typeof total === 'number' ? total : null,
+        total: reglas.totalBusqueda(total, encontrados),
         hayMas: documentos.length >= reglas.TAMANO_PAGINA,
         documentos,
       };

@@ -22,26 +22,47 @@ const sumarDias = (fecha, dias) => new Date(Date.parse(`${fecha}T00:00:00Z`) + d
  * Convierte los filtros de la pantalla en el cuerpo de outbounddocuments/search.
  * Solo trae documentos soporte (y notas de ajuste) en los que la compañía es el adquiriente.
  */
-function filtroBusqueda({ desde, hasta, numero, pagina } = {}, nit, ahora = new Date()) {
+/** Valida el rango de fechas (AAAA-MM-DD, Colombia) y lo convierte a las fechas UTC que espera Saphety. */
+function rangoFechas(desde, hasta, ahora = new Date()) {
   const fin = hasta || hoyBogota(ahora);
   const inicio = desde || sumarDias(fin, -DIAS_POR_DEFECTO);
   if (!FECHA.test(inicio) || !FECHA.test(fin)) throw fallo(400, 'Las fechas deben tener el formato AAAA-MM-DD.');
   if (inicio > fin) throw fallo(400, 'La fecha inicial es posterior a la final.');
   if (sumarDias(inicio, DIAS_MAXIMOS) < fin) throw fallo(400, `Consulta como máximo ${DIAS_MAXIMOS} días.`);
-  const p = Math.max(Number.parseInt(pagina, 10) || 0, 0);
-  const cuerpo = {
-    DocumentTypes: TIPOS_DOCUMENTO,
-    CustomerCodes: [codigoCompania(nit)],
+  return {
+    desde: inicio,
+    hasta: fin,
     // Las fechas de la pantalla son de Colombia (UTC-5).
     CreationDateStart: new Date(`${inicio}T00:00:00-05:00`).toISOString(),
     CreationDateEnd: new Date(`${fin}T23:59:59.999-05:00`).toISOString(),
+  };
+}
+
+const numeroPagina = (pagina) => Math.max(Number.parseInt(pagina, 10) || 0, 0);
+
+/**
+ * Convierte los filtros de la pantalla en el cuerpo de outbounddocuments/search.
+ * Solo trae documentos soporte (y notas de ajuste) en los que la compañía es el adquiriente.
+ */
+function filtroBusqueda({ desde, hasta, numero, pagina } = {}, nit, ahora = new Date()) {
+  const r = rangoFechas(desde, hasta, ahora);
+  const p = numeroPagina(pagina);
+  const cuerpo = {
+    DocumentTypes: TIPOS_DOCUMENTO,
+    CustomerCodes: [codigoCompania(nit)],
+    CreationDateStart: r.CreationDateStart,
+    CreationDateEnd: r.CreationDateEnd,
     Offset: p,
     NumberOfRecords: TAMANO_PAGINA,
   };
   const n = String(numero || '').trim().toUpperCase();
   if (n) cuerpo.DocumentNumber = n;
-  return { cuerpo, pagina: p, desde: inicio, hasta: fin };
+  return { cuerpo, pagina: p, desde: r.desde, hasta: r.hasta };
 }
+
+/** Total de la búsqueda: el conteo si llegó; si no, el Total que trae la búsqueda. */
+const totalBusqueda = (conteo, resultData) => (typeof conteo === 'number' ? conteo
+  : resultData && typeof resultData.Total === 'number' ? resultData.Total : null);
 
 /** Estado de Saphety/DIAN -> estado de la app (aceptado, rechazado o en proceso). */
 function estadoApp(estadoSaphety) {
@@ -116,5 +137,5 @@ function validarId(id) {
 
 module.exports = {
   TIPOS_DOCUMENTO, TAMANO_PAGINA, FORMATOS, filtroBusqueda, estadoApp, listaDocumentos, resumenEmitido, perteneceA, lineasDto,
-  validarId, codigoCompania, hoyBogota,
+  validarId, codigoCompania, hoyBogota, rangoFechas, numeroPagina, totalBusqueda, soloDigitos,
 };
