@@ -18,7 +18,7 @@ function esc(v) {
 
 const ETIQUETAS_ESTADO = {
   pendiente: 'Listo para enviar', con_errores: 'Con errores', aceptado: 'Aceptado', rechazado: 'Rechazado',
-  simulado: 'Simulado', error_envio: 'Error de envío',
+  simulado: 'Simulado', error_envio: 'Error de envío', en_proceso: 'En proceso',
 };
 const chip = (estado) => `<span class="chip ${esc(estado)}">${esc(ETIQUETAS_ESTADO[estado] || estado)}</span>`;
 const pesos = (n) => (n == null ? '' : Number(n).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));

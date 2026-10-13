@@ -40,6 +40,8 @@ La contraseña de Saphety se escribe en Administración, se guarda cifrada (AES-
 
 4. **Historial**: cada envío real queda guardado con el JSON enviado, la respuesta de Saphety y el XML. El Excel y los envíos simulados no se guardan.
 
+5. **Emitidos**: consulta en línea en Saphety los documentos soporte y notas de ajuste de la compañía (en los que su NIT es el adquiriente), por rango de fechas y número, con el estado ante la DIAN. Incluye los creados por fuera de esta app. Al abrir uno se ven el PDF, el resumen, los ítems, las respuestas de la DIAN y los errores de validación, y se descargan el PDF, el XML y el AttachedDocument. Requiere el NIT configurado en la compañía; no guarda nada.
+
 Protecciones: si las filas de un mismo folio no coinciden en CEDULA O NIT, FECHA_DOC o MONEDA el documento se marca con error; un documento del Excel (PREFIJO + FOLIO) que Saphety ya aceptó, con cualquier numeración, se marca como error y no se reenvía; si su último envío quedó con error de conexión se muestra un aviso para revisarlo en Saphety; si falla el token se detiene el envío.
 
 ## Mapeo Excel → JSON
@@ -76,8 +78,8 @@ Monolito desplegado como una función serverless. Las dependencias van solo haci
 | Rutas | `src/rutas/` | URL → middleware → controlador. Sin lógica |
 | Middlewares | `src/middlewares/` | Sesión, manejo de errores, envoltorio async |
 | Controladores | `src/controladores/` | Traducen HTTP ↔ servicio (req → parámetros, resultado → JSON/cookie). Sin reglas de negocio |
-| Servicios | `src/servicios/` | Lógica de negocio y permisos: autenticación, compañías, usuarios, documentos (conversión, duplicados, consecutivo, envío), historial |
-| Dominio | `src/dominio/` | Reglas puras: fila → JSON de Saphety y validaciones (`mapper.js`), capitales, errores de negocio |
+| Servicios | `src/servicios/` | Lógica de negocio y permisos: autenticación, compañías, usuarios, documentos (conversión, duplicados, consecutivo, envío), historial, emitidos (consulta en Saphety) |
+| Dominio | `src/dominio/` | Reglas puras: fila → JSON de Saphety y validaciones (`mapper.js`), filtros y estados de los emitidos (`emitidos.js`), capitales, errores de negocio |
 | Repositorios | `src/repositorios/` | Acceso a datos con la misma interfaz: `supabase.js` (producción) o `archivo.js` (local y pruebas) |
 | Infraestructura | `src/infraestructura/` | Cliente de la API de Saphety, lectura del Excel, cifrado AES y seguridad (scrypt, sesión firmada) |
 | Configuración | `src/config/` | Variables de entorno y parámetros por defecto de una compañía |

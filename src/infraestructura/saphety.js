@@ -1,5 +1,5 @@
 'use strict';
-// Cliente de la API de Saphety: 1) pide el token, 2) crea el documento soporte.
+// Cliente de la API de Saphety: 1) pide el token, 2) crea el documento soporte, 3) consulta los emitidos.
 // Igual que en Postman: POST {url}/v2/auth/gettoken y luego
 // POST {url}/v2/{opv}/outbounddocuments/supportDocument con "Authorization: Bearer <token>".
 
@@ -118,4 +118,86 @@ async function catalogo(perfilId, cfg, clave, nombre) {
   return datos;
 }
 
-module.exports = { obtenerToken, olvidarToken, crearDocumentoSoporte, simular, catalogo, mensajeRespuesta };
+/**
+ * Petición autenticada a {url}/v2/{opv}/{ruta}. Con 401 pide un token nuevo y reintenta una vez.
+ * Devuelve { status, datos } (JSON) o, con binario, { status, contenido: Buffer, tipo }.
+ */
+async function llamar(perfilId, cfg, clave, ruta, { metodo = 'GET', cuerpo, binario = false } = {}) {
+  const url = `${base(cfg)}/v2/${encodeURIComponent(cfg.opv)}/${ruta}`;
+  const hacer = async (token) => {
+    const headers = { Authorization: `Bearer ${token}` };
+    if (cuerpo !== undefined) headers['Content-Type'] = 'application/json';
+    const opciones = { method: metodo, headers, body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo) };
+    if (!binario) return pedirJson(url, opciones);
+    const resp = await fetch(url, { ...opciones, signal: AbortSignal.timeout(90_000) });
+    return { status: resp.status, contenido: Buffer.from(await resp.arrayBuffer()), tipo: resp.headers.get('content-type') || '' };
+  };
+  let r = await hacer(await obtenerToken(perfilId, cfg, clave));
+  if (r.status === 401) r = await hacer(await obtenerToken(perfilId, cfg, clave, { forzar: true }));
+  return r;
+}
+
+/** ResultData de una respuesta correcta; si no, un error con el mensaje de Saphety (404 si el documento no existe). */
+function resultado({ status, datos }, accion) {
+  if (status >= 200 && status < 300 && datos && datos.IsValid !== false) return datos.ResultData;
+  const noExiste = status === 404 || (datos && (datos.Errors || []).some((e) => e.Code === 'DocumentNotFound'));
+  const e = new Error(noExiste ? 'Saphety no encontró el documento.' : `Saphety no respondió bien al ${accion} (HTTP ${status}): ${mensajeRespuesta(datos) || ''}`.trim());
+  e.status = noExiste ? 404 : 502;
+  throw e;
+}
+
+/** Busca documentos emitidos (outbounddocuments/search) con el filtro ya armado. */
+async function buscarEmitidos(perfilId, cfg, clave, filtro) {
+  return resultado(await llamar(perfilId, cfg, clave, 'outbounddocuments/search', { metodo: 'POST', cuerpo: filtro }), 'buscar documentos');
+}
+
+/** Cuenta los documentos emitidos que cumplen el filtro (outbounddocuments/count). */
+async function contarEmitidos(perfilId, cfg, clave, filtro) {
+  return resultado(await llamar(perfilId, cfg, clave, 'outbounddocuments/count', { metodo: 'POST', cuerpo: filtro }), 'contar documentos');
+}
+
+const rutaEmitido = (id, extra = '') => `outbounddocuments/${encodeURIComponent(id)}${extra}`;
+
+/** Metadatos de un documento emitido (número, partes, estado, valor, CUDS). */
+async function emitido(perfilId, cfg, clave, id) {
+  return resultado(await llamar(perfilId, cfg, clave, rutaEmitido(id)), 'consultar el documento');
+}
+
+/** Estado actual del documento y, si los hay, los errores de validación. */
+async function estadoEmitido(perfilId, cfg, clave, id) {
+  return resultado(await llamar(perfilId, cfg, clave, rutaEmitido(id, '/status')), 'consultar el estado');
+}
+
+/** Respuestas (ApplicationResponse) de la DIAN y del adquiriente asociadas al documento. */
+async function respuestasEmitido(perfilId, cfg, clave, id) {
+  return resultado(await llamar(perfilId, cfg, clave, rutaEmitido(id, '/applicationresponses')), 'consultar las respuestas de la DIAN');
+}
+
+/** Archivo del documento: pdf, ubl, attacheddocument o dto. */
+async function archivoEmitido(perfilId, cfg, clave, id, formato) {
+  const r = await llamar(perfilId, cfg, clave, rutaEmitido(id, `/${formato}/content`), { binario: true });
+  if (r.status < 200 || r.status >= 300) {
+    const e = new Error(r.status === 404 ? 'Saphety no tiene ese archivo para el documento.' : `Saphety no entregó el archivo (HTTP ${r.status}).`);
+    e.status = r.status === 404 ? 404 : 502;
+    throw e;
+  }
+  return { contenido: desenvolver(r.contenido), tipo: r.tipo };
+}
+
+/** Si el archivo llega envuelto en la respuesta estándar de Saphety ({ ResultData: base64 }), lo decodifica. */
+function desenvolver(contenido) {
+  if (contenido[0] !== 0x7b) return contenido; // no empieza con "{"
+  try {
+    const datos = JSON.parse(contenido.toString('utf8'));
+    const rd = datos && 'IsValid' in datos ? datos.ResultData : null;
+    const b64 = typeof rd === 'string' ? rd : rd && typeof rd.Content === 'string' ? rd.Content : null;
+    return b64 ? Buffer.from(b64, 'base64') : contenido;
+  } catch {
+    return contenido;
+  }
+}
+
+module.exports = {
+  obtenerToken, olvidarToken, crearDocumentoSoporte, simular, catalogo, mensajeRespuesta,
+  buscarEmitidos, contarEmitidos, emitido, estadoEmitido, respuestasEmitido, archivoEmitido,
+};

@@ -10,6 +10,7 @@ const { crearServicioCompanias } = require('./servicios/companias.servicio');
 const { crearServicioUsuarios } = require('./servicios/usuarios.servicio');
 const { crearServicioDocumentos } = require('./servicios/documentos.servicio');
 const { crearServicioHistorial } = require('./servicios/historial.servicio');
+const { crearServicioEmitidos } = require('./servicios/emitidos.servicio');
 
 function crearContenedor(entorno) {
   // Los repositorios se crean al primer uso: así un error de configuración (p. ej. faltan
@@ -28,6 +29,7 @@ function crearContenedor(entorno) {
     usuarios: crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }),
     documentos: crearServicioDocumentos({ companias, perfiles, envios, saphety, excel }),
     historial: crearServicioHistorial({ envios }),
+    emitidos: crearServicioEmitidos({ companias, perfiles, saphety }),
   };
   return { entorno, servicios, tipoAlmacen: () => repositorios().tipo };
 }

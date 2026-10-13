@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emitidos</title>
+<link rel="stylesheet" href="app.css">
+<script src="comun.js"></script>
+</head>
+<body>
+<header>
+  <h1>Documentos soporte · Saphety</h1>
+  <nav><a href="index.html">Cargar y enviar</a><a href="emitidos.html" class="activo">Emitidos</a><a href="historial.html">Historial</a><a href="admin.html" data-enlace-admin>Administración</a></nav>
+  <div id="banner"></div>
+</header>
+<main>
+  <div class="encabezado">
+    <div>
+      <p class="antetitulo" id="antetitulo">Documentos emitidos</p>
+      <h1>Emitidos</h1>
+      <p class="ayuda">Documentos soporte y notas de ajuste de tu compañía, consultados en línea en Saphety con su estado ante la DIAN. Incluye los creados desde esta app y desde cualquier otro medio.</p>
+    </div>
+  </div>
+
+  <div class="metricas">
+    <article class="metrica"><p class="etiqueta">Documentos en el rango</p><p class="valor" id="mTotal">—</p><p class="nota" id="mRango"></p></article>
+    <article class="metrica"><p class="etiqueta">Aceptados por DIAN</p><p class="valor ok" id="mAceptados">—</p><p class="nota">En esta página</p></article>
+    <article class="metrica"><p class="etiqueta">Rechazados</p><p class="valor err" id="mRechazados">—</p><p class="nota">En esta página</p></article>
+    <article class="metrica"><p class="etiqueta">Valor</p><p class="valor" id="mValor">—</p><p class="nota">Suma de esta página (COP)</p></article>
+  </div>
+
+  <section class="panel">
+    <h2>Filtros</h2>
+    <form class="filtros" id="filtros">
+      <div><label for="desde">Desde</label><input type="date" id="desde"></div>
+      <div><label for="hasta">Hasta</label><input type="date" id="hasta"></div>
+      <div><label for="numero">Número (prefijo + consecutivo)</label><input id="numero" placeholder="Ej. SEDS984003687"></div>
+      <div><button type="submit">Buscar documentos</button></div>
+    </form>
+    <p class="ayuda">Por fecha de creación en Saphety. Sin fechas se muestran los últimos 30 días.</p>
+  </section>
+
+  <section class="panel">
+    <div id="msg"></div>
+    <div class="tabla-scroll">
+      <table>
+        <thead><tr><th>Creado</th><th>Tipo / Número</th><th>Proveedor</th><th class="num">Valor</th><th>Estado DIAN</th><th>Correo</th></tr></thead>
+        <tbody id="filas"></tbody>
+      </table>
+    </div>
+    <div class="paginacion">
+      <span id="infoPagina"></span>
+      <div class="fila-botones" style="margin:0">
+        <button class="secundario" id="btnAnterior" disabled>Anterior</button>
+        <button class="secundario" id="btnSiguiente" disabled>Siguiente</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const fecha = (iso) => (iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }) : '');
+let pagina = 0;
+
+async function cargar() {
+  const msg = document.getElementById('msg');
+  const filas = document.getElementById('filas');
+  const q = new URLSearchParams({ pagina });
+  for (const id of ['desde', 'hasta', 'numero']) {
+    const v = document.getElementById(id).value.trim();
+    if (v) q.set(id, v);
+  }
+  msg.innerHTML = '<div class="aviso warn">Consultando Saphety…</div>';
+  filas.innerHTML = '';
+  try {
+    const r = await api(`/api/emitidos?${q}`);
+    document.getElementById('desde').value = r.desde;
+    document.getElementById('hasta').value = r.hasta;
+    document.getElementById('antetitulo').textContent = `Documentos emitidos · ${r.compania}`;
+    const docs = r.documentos;
+    const cuenta = (e) => docs.filter((d) => d.estado === e).length;
+    document.getElementById('mTotal').textContent = r.total != null ? r.total.toLocaleString('es-CO') : docs.length;
+    document.getElementById('mRango').textContent = `${r.desde} a ${r.hasta}`;
+    document.getElementById('mAceptados').textContent = cuenta('aceptado');
+    document.getElementById('mRechazados').textContent = cuenta('rechazado');
+    document.getElementById('mValor').textContent = `$ ${docs.reduce((s, d) => s + (d.moneda === 'COP' ? Number(d.valor) || 0 : 0), 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
+    msg.innerHTML = docs.length ? '' : '<div class="aviso warn">No hay documentos en ese rango.</div>';
+    filas.innerHTML = docs.map((d) => `<tr class="clic" data-id="${esc(d.id)}">
+      <td>${esc(fecha(d.fechaCreacion))}</td>
+      <td><div class="ayuda" style="margin:0">${esc(d.tipo)}</div><a class="enlace-doc" href="documento.html?id=${encodeURIComponent(d.id)}">${esc(d.numero)}</a></td>
+      <td>${esc(d.proveedor)}<div class="codigo">${esc(d.proveedorCodigo)}</div></td>
+      <td class="num">${d.moneda !== 'COP' ? esc(d.moneda) + ' ' : ''}${pesos(d.valor)}</td>
+      <td>${chip(d.estado)}<div class="codigo">${esc(d.estadoSaphety)}</div></td>
+      <td>${esc(d.correoEstado)}<div class="codigo">${esc(d.correo)}</div></td></tr>`).join('');
+    filas.querySelectorAll('tr.clic').forEach((tr) => tr.onclick = (ev) => {
+      if (ev.target.closest('a')) return;
+      location.href = `documento.html?id=${encodeURIComponent(tr.dataset.id)}`;
+    });
+    const desdeN = r.pagina * r.tamanoPagina;
+    document.getElementById('infoPagina').textContent = docs.length
+      ? `Página ${r.pagina + 1} · mostrando ${desdeN + 1}–${desdeN + docs.length}${r.total != null ? ` de ${r.total.toLocaleString('es-CO')}` : ''}` : '';
+    document.getElementById('btnAnterior').disabled = r.pagina === 0;
+    document.getElementById('btnSiguiente').disabled = !r.hayMas;
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err">${esc(e.message)}</div>`;
+  }
+}
+
+document.getElementById('filtros').onsubmit = (ev) => { ev.preventDefault(); pagina = 0; cargar(); };
+document.getElementById('btnAnterior').onclick = () => { pagina = Math.max(pagina - 1, 0); cargar(); };
+document.getElementById('btnSiguiente').onclick = () => { pagina += 1; cargar(); };
+cargar();
+</script>
+</body>
+</html>
