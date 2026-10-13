@@ -14,6 +14,7 @@ const reglas = require('../src/dominio/recibidos');
 const ID_PROPIO = '5d1c2a10-9b7e-4c3a-8f21-0a1b2c3d4e5f';
 const ID_AJENO = '6e2d3b21-ac8f-4d4b-9032-1b2c3d4e5f60';
 const doc = (id, numero, destino, estado = 'Registered') => ({
+  CompanyId: destino === 'CO_NIT_860031699' ? 'C-VITRO' : 'c-otra',
   Id: id, DocumentType: 'SalesInvoice', DocumentNumber: numero, OriginName: 'PROVEEDOR SAS', OriginCode: 'CO_NIT_900123456',
   DestinationName: 'Vitro', DestinationCode: destino, DocumentDate: '2026-10-01T10:00:00Z', CreationDate: '2026-10-01T10:05:00Z',
   DocumentStatus: estado, Currency: 'COP', TotalAmount: 119000, TotalTaxableAmount: 100000, VatTotalAmount: 19000, Cufe: 'cufe-abc',
@@ -26,14 +27,14 @@ test('reglas: filtro, estados y eventos permitidos', () => {
   assert.deepStrictEqual(cuerpo.SuppliersCodes, ['CO_NIT_900123456']);
   assert.deepStrictEqual(cuerpo.DocumentStatus, ['Registered', 'Received', 'GoodsOrServicesReceived']);
   assert.strictEqual(cuerpo.DocumentNumber, 'FE1');
-  assert.ok(!('CompanyIds' in reglas.filtroBusqueda({}, {}).cuerpo));
   assert.throws(() => reglas.filtroBusqueda({ estado: 'otro' }, {}), /Estado inválido/);
   assert.deepStrictEqual(reglas.eventosPermitidos('Registered'), ['acuse']);
   assert.deepStrictEqual(reglas.eventosPermitidos('Received'), ['reciboBien']);
   assert.deepStrictEqual(reglas.eventosPermitidos('GoodsOrServicesReceived'), ['aceptar', 'rechazar']);
   assert.deepStrictEqual(reglas.eventosPermitidos('Accepted'), []);
-  assert.ok(reglas.esAdquiriente({ DestinationCode: 'CO_NIT_860031699' }, '860.031.699'));
-  assert.ok(!reglas.esAdquiriente({ DestinationCode: 'CO_NIT_900' }, '860031699'));
+  assert.ok(reglas.esDeLaEmpresa({ CompanyId: 'C-1' }, 'c-1'));
+  assert.ok(!reglas.esDeLaEmpresa({ CompanyId: 'c-2' }, 'c-1'));
+  assert.ok(reglas.esDeLaEmpresa({ DestinationCode: 'CO_NIT_900' }, 'c-1'), 'sin CompanyId se confía en la consulta');
   assert.throws(() => reglas.datosEvento('acuse', { persona: { nombre: 'Ana' } }), /nombre, apellido y documento/);
   const { persona } = reglas.datosEvento('acuse', { persona: { nombre: 'Ana', apellido: 'Gómez', documento: '1.020.304' } });
   assert.deepStrictEqual(persona.Identification, { DocumentNumber: '1020304', DocumentType: 'CC', CountryCode: 'CO' });
@@ -54,7 +55,6 @@ test('recibidos: lista, detalle, archivos y eventos solo de la compañía', asyn
       if (req.url === '/v2/auth/gettoken') return ok({ access_token: 'tok', expires: new Date(Date.now() + 3600e3).toISOString() });
       llamadas.push({ metodo: req.method, url: req.url, cuerpo: cuerpo && JSON.parse(cuerpo) });
       const base = '/v2/jtc/inbounddocuments';
-      if (req.url === `${base}/search` && JSON.parse(cuerpo).DocumentNumber === 'NADA') return ok({ Items: [doc(ID_AJENO, 'X1', 'CO_NIT_900111222')], Total: 1 });
       if (req.url === `${base}/search`) return ok({ Items: [doc(ID_PROPIO, 'FE100', 'CO_NIT_860031699', estado), doc(ID_AJENO, 'X1', 'CO_NIT_900111222')], Total: 2 });
       if (req.url === `${base}/count`) return json({ IsValid: false, Errors: [{ Code: 'Boom' }] }, 500);
       if (req.url === `${base}/${ID_PROPIO}`) return ok(doc(ID_PROPIO, 'FE100', 'CO_NIT_860031699', estado));
@@ -83,16 +83,20 @@ test('recibidos: lista, detalle, archivos y eventos solo de la compañía', asyn
     const actualizar = (datos) => fetch(`${URL_APP}/api/perfiles/${perfil.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) });
     await actualizar({ nombre: 'Vitro', config: { url: `http://127.0.0.1:${sMock.address().port}`, usuario: 'u@test.com', opv: 'jtc', nit: '860031699' }, clave: 'secreta' });
 
+    // Sin companyId no se sabe cuál es la empresa conectada
+    const sinCompania = await json('/api/recibidos');
+    assert.strictEqual(sinCompania.status, 400);
+    assert.match(sinCompania.datos.error, /companyId/);
+    await actualizar({ config: { companyId: 'c-vitro' } });
+
     // El conteo falla pero la lista sale con el Total de la búsqueda; el documento ajeno no llega
     const lista = await json('/api/recibidos?estado=pendientes');
     assert.strictEqual(lista.status, 200, JSON.stringify(lista.datos));
     assert.deepStrictEqual(lista.datos.documentos.map((d) => [d.numero, d.estadoTexto, d.eventos]), [['FE100', 'Recibido en buzón', ['acuse']]]);
     assert.strictEqual(lista.datos.total, 2);
 
-    // Sin documentos propios se explica que los que hay en la cuenta son de otras empresas
-    const vacia = await json('/api/recibidos?numero=nada');
-    assert.deepStrictEqual([vacia.datos.documentos.length, vacia.datos.total], [0, 0]);
-    assert.match(vacia.datos.avisos[0], /otras empresas: Vitro \(900111222\)/);
+    // La búsqueda va solo por el companyId de la empresa conectada
+    assert.deepStrictEqual(llamadas.find((l) => l.url.endsWith('/search')).cuerpo.CompanyIds, ['c-vitro']);
 
     const detalle = await json(`/api/recibidos/${ID_PROPIO}`);
     assert.strictEqual(detalle.status, 200, JSON.stringify(detalle.datos));

@@ -34,7 +34,7 @@ const CONCEPTOS_RECLAMO = {
 
 const ESTADO_FILTRO = { pendientes: ['Registered', 'Received', 'GoodsOrServicesReceived'], aceptados: ['Accepted', 'TacitlyAccepted'], rechazados: ['Rejected'] };
 
-/** Cuerpo de inbounddocuments/search: documentos en los que la compañía es el adquiriente. */
+/** Cuerpo de inbounddocuments/search: documentos de la empresa conectada (su companyId en Saphety es el adquiriente). */
 function filtroBusqueda({ desde, hasta, numero, proveedor, estado, pagina } = {}, cfg, ahora = new Date()) {
   const r = rangoFechas(desde, hasta, ahora);
   const p = numeroPagina(pagina);
@@ -45,7 +45,7 @@ function filtroBusqueda({ desde, hasta, numero, proveedor, estado, pagina } = {}
     Offset: p,
     NumberOfRecords: TAMANO_PAGINA,
   };
-  if (cfg.companyId) cuerpo.CompanyIds = [cfg.companyId];
+  cuerpo.CompanyIds = [cfg.companyId];
   const n = String(numero || '').trim().toUpperCase();
   if (n) cuerpo.DocumentNumber = n;
   const nitProveedor = soloDigitos(proveedor);
@@ -57,8 +57,14 @@ function filtroBusqueda({ desde, hasta, numero, proveedor, estado, pagina } = {}
   return { cuerpo, pagina: p, desde: r.desde, hasta: r.hasta };
 }
 
-/** El documento es de la compañía si ella es el adquiriente (destino). */
-const esAdquiriente = (d, nit) => soloDigitos(String(d.DestinationCode || '').split('_').pop()) === soloDigitos(nit);
+/**
+ * El documento es de la empresa conectada si su companyId coincide. Si Saphety no trae el companyId en el
+ * documento, se confía en la consulta (que ya se hace con el companyId de la empresa).
+ */
+function esDeLaEmpresa(d, companyId) {
+  const id = d.CompanyId || d.CompanyID || d.DestinationCompanyId;
+  return !id || String(id).toLowerCase() === String(companyId || '').toLowerCase();
+}
 
 /** Eventos que se pueden registrar en el estado actual. */
 const eventosPermitidos = (estadoSaphety) => Object.keys(EVENTOS).filter((k) => EVENTOS[k].desde.includes(estadoSaphety));
@@ -123,5 +129,5 @@ function datosEvento(tipo, { persona = {}, motivo, concepto } = {}) {
 }
 
 module.exports = {
-  TIPOS_DOCUMENTO, EVENTOS, CONCEPTOS_RECLAMO, filtroBusqueda, esAdquiriente, eventosPermitidos, resumenRecibido, datosEvento,
+  TIPOS_DOCUMENTO, EVENTOS, CONCEPTOS_RECLAMO, filtroBusqueda, esDeLaEmpresa, eventosPermitidos, resumenRecibido, datosEvento,
 };
