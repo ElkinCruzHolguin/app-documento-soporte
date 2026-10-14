@@ -154,14 +154,15 @@ async function cargar() {
     document.getElementById('titulo').textContent = d.numero;
     document.getElementById('subtitulo').innerHTML = `<span class="chip ${esc(d.estado)}">${esc(d.estadoTexto)}</span> · ${esc(d.proveedor)}`;
     document.getElementById('acciones').innerHTML = `
-      <button class="secundario" id="btnCopiar" ${d.cufe ? '' : 'disabled'}>Copiar CUFE</button>
+      ${d.consultaDian
+        ? `<a class="boton secundario" id="btnDian" href="${esc(d.consultaDian)}" target="_blank" rel="noreferrer" title="Abre el portal de la DIAN con el CUFE ya puesto; allí solo resuelves el captcha.">Consultar CUFE en la DIAN</a>`
+        : '<button class="secundario" disabled>Consultar CUFE en la DIAN</button>'}
       <a class="boton secundario" href="${urlArchivo('xml', true)}">XML</a>
       <a class="boton secundario" href="${urlArchivo('attached', true)}">AttachedDocument</a>
       <a class="boton" href="${urlArchivo('pdf', true)}">Descargar PDF</a>`;
-    document.getElementById('btnCopiar').onclick = async () => {
-      await navigator.clipboard.writeText(d.cufe);
-      document.getElementById('btnCopiar').textContent = 'CUFE copiado';
-    };
+    // Además copia el CUFE, por si el portal de la DIAN no lo deja escrito en la casilla.
+    const btnDian = document.getElementById('btnDian');
+    if (btnDian) btnDian.addEventListener('click', () => { navigator.clipboard?.writeText(d.cufe).catch(() => {}); });
     document.getElementById('resumen').innerHTML = [
       dato('Estado', `<span class="chip ${esc(d.estado)}">${esc(d.estadoTexto)}</span> <span class="codigo">${esc(d.estadoSaphety)}</span>`),
       dato('Fecha de estado', esc(fecha(d.estadoFecha))),

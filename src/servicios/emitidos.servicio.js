@@ -3,6 +3,7 @@
 // Cada actor consulta con la conexión de su compañía y solo ve los documentos de ella.
 const { fallo } = require('../dominio/errores');
 const reglas = require('../dominio/emitidos');
+const { urlConsultaDian } = require('../dominio/dian');
 
 function crearServicioEmitidos({ companias, perfiles, saphety, log = console }) {
   /** Compañía del actor, su NIT y lo necesario para llamar a Saphety. */
@@ -51,7 +52,7 @@ function crearServicioEmitidos({ companias, perfiles, saphety, log = console }) 
 
     async obtener(actor, id) {
       const docId = reglas.validarId(id);
-      const { nit, llamar } = await conexion(actor);
+      const { compania, nit, llamar } = await conexion(actor);
       const metadatos = await llamar('emitido', docId);
       if (!metadatos || !reglas.perteneceA(metadatos, nit)) throw fallo(404, 'Documento no encontrado para esta compañía.');
       const avisos = [];
@@ -65,6 +66,7 @@ function crearServicioEmitidos({ companias, perfiles, saphety, log = console }) 
         documento.estadoSaphety = estado.Status;
         documento.estado = reglas.estadoApp(estado.Status);
       }
+      documento.consultaDian = urlConsultaDian(documento.cuds, compania.config.url);
       return {
         documento,
         validaciones: (estado && estado.ValidationErrors) || [],

@@ -10,6 +10,16 @@ const http = require('node:http');
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ds-recibidos-'));
 const { app } = require('../src/server');
 const reglas = require('../src/dominio/recibidos');
+const dian = require('../src/dominio/dian');
+
+test('dominio: URL de consulta del CUFE/CUDS en la DIAN según el ambiente de Saphety', () => {
+  assert.strictEqual(dian.urlConsultaDian('ab12', 'https://api-factura-electronica-co-qa.saphety.com'),
+    'https://catalogo-vpfe-hab.dian.gov.co/document/searchqr?documentkey=ab12');
+  assert.strictEqual(dian.urlConsultaDian('ab12', 'https://api-factura-electronica-co.saphety.com'),
+    'https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=ab12');
+  assert.strictEqual(dian.urlConsultaDian('', 'x'), null);
+  assert.strictEqual(dian.urlConsultaDian(null, 'x'), null);
+});
 
 const ID_PROPIO = '5d1c2a10-9b7e-4c3a-8f21-0a1b2c3d4e5f';
 const ID_AJENO = '6e2d3b21-ac8f-4d4b-9032-1b2c3d4e5f60';
@@ -101,6 +111,8 @@ test('recibidos: lista, detalle, archivos y eventos solo de la compañía', asyn
     const detalle = await json(`/api/recibidos/${ID_PROPIO}`);
     assert.strictEqual(detalle.status, 200, JSON.stringify(detalle.datos));
     assert.strictEqual(detalle.datos.documento.iva, 19000);
+    // Un servidor que no es de calidad (QA) se consulta en el catálogo de producción de la DIAN.
+    assert.strictEqual(detalle.datos.documento.consultaDian, 'https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=cufe-abc');
     assert.strictEqual(detalle.datos.modoEnvio, 'simulado');
     assert.strictEqual(detalle.datos.respuestas[0].ResponseCode, '030');
 
