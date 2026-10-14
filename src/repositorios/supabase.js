@@ -63,6 +63,22 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
       const p = await filaPerfil(id);
       return { prefijo: conDefaults(p.config).prefijoConsecutivo, numero: String(n) };
     },
+    /**
+     * Reserva el siguiente número de nota de ajuste. Sin función SQL nueva: actualiza solo si nadie lo cambió
+     * entre la lectura y la escritura (si otro lo tomó, vuelve a intentar).
+     */
+    tomarConsecutivoNota: async (id) => {
+      for (let intento = 0; intento < 5; intento++) {
+        const p = await filaPerfil(id);
+        if (!p) throw fallo(404, 'Compañía no encontrada.');
+        const leido = p.config.siguienteNotaAjuste;
+        const n = Number(conDefaults(p.config).siguienteNotaAjuste);
+        let q = db.from('perfiles').update({ config: { ...p.config, siguienteNotaAjuste: n + 1 }, actualizado_en: new Date().toISOString() }).eq('id', Number(id));
+        q = leido == null ? q.is('config->siguienteNotaAjuste', null) : q.eq('config->>siguienteNotaAjuste', String(leido));
+        if (revisar(await q.select('id')).length) return { prefijo: conDefaults(p.config).prefijoNotaAjuste, numero: String(n) };
+      }
+      throw new Error('No se pudo reservar el número de la nota de ajuste; intenta de nuevo.');
+    },
   };
 
   const aEnvio = (f) => f && ({
@@ -100,6 +116,9 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
       return revisar(await q).map(aEnvio).map(resumenEnvio);
     },
     obtener: async (id) => aEnvio(revisar(await db.from('envios').select('*').eq('id', Number(id)).maybeSingle())),
+    /** Último envío real con ese id de Saphety (incluye el JSON enviado), o null. */
+    porSaphetyId: async (saphetyId) => aEnvio(revisar(await db.from('envios').select('*')
+      .eq('modo', 'real').eq('saphety_id', String(saphetyId)).order('id', { ascending: false }).limit(1))[0]),
   };
 
   const aUsuario = (f) => f && ({

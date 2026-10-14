@@ -4,7 +4,7 @@
 const { fallo } = require('../dominio/errores');
 
 const esAdmin = (actor) => actor.rol === 'admin';
-const CAMPOS_NUMERICOS = ['siguienteConsecutivo'];
+const CAMPOS_NUMERICOS = ['siguienteConsecutivo', 'siguienteNotaAjuste'];
 const CAMPOS_BOOLEANOS = ['incluirIvaCero', 'incluirTelefono'];
 const CAMPOS_JSON = [['tiposDocumento', 'tipos de documento']];
 

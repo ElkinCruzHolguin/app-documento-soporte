@@ -11,6 +11,7 @@ const { crearControladorHistorial } = require('../controladores/historial.contro
 const { crearControladorEmitidos } = require('../controladores/emitidos.controlador');
 const { crearControladorRecibidos } = require('../controladores/recibidos.controlador');
 const { crearControladorDashboard } = require('../controladores/dashboard.controlador');
+const { crearControladorNotasAjuste } = require('../controladores/notasAjuste.controlador');
 
 function crearRutasApi({ servicios, entorno }) {
   const opciones = { cookieSegura: entorno.enVercel };
@@ -22,6 +23,7 @@ function crearRutasApi({ servicios, entorno }) {
   const emitidos = crearControladorEmitidos(servicios);
   const recibidos = crearControladorRecibidos(servicios);
   const dashboard = crearControladorDashboard(servicios);
+  const notasAjuste = crearControladorNotasAjuste(servicios);
   const r = express.Router();
   const a = asincrono;
 
@@ -54,7 +56,9 @@ function crearRutasApi({ servicios, entorno }) {
 
   r.get('/emitidos', a(emitidos.listar));
   r.get('/emitidos/:id', a(emitidos.obtener));
+  r.get('/emitidos/:id/nota-ajuste', a(notasAjuste.preparar)); // antes de /:formato, que también la atraparía
   r.get('/emitidos/:id/:formato', a(emitidos.archivo));
+  r.post('/emitidos/:id/nota-ajuste', a(notasAjuste.enviar));
 
   r.get('/dashboard', a(dashboard.obtener));
 
