@@ -70,6 +70,8 @@ async function cargar() {
       ${d.consultaDian
         ? `<a class="boton secundario" id="btnDian" href="${esc(d.consultaDian)}" target="_blank" rel="noreferrer" title="Abre el portal de la DIAN con el CUDS ya puesto; allí solo resuelves el captcha.">Consultar CUDS en la DIAN</a>`
         : '<button class="secundario" disabled>Consultar CUDS en la DIAN</button>'}
+      ${d.tipo === 'Documento soporte' && d.estado === 'aceptado'
+        ? `<a class="boton secundario" href="nota.html?id=${encodeURIComponent(d.id)}">Crear nota de ajuste</a>` : ''}
       <a class="boton secundario" href="${urlArchivo('xml', true)}">XML</a>
       <a class="boton secundario" href="${urlArchivo('attached', true)}">AttachedDocument</a>
       <a class="boton" href="${urlArchivo('pdf', true)}">Descargar PDF</a>`;

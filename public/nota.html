@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nota de ajuste</title>
+<link rel="stylesheet" href="app.css">
+<script src="comun.js"></script>
+</head>
+<body>
+<header>
+  <h1>Documentos soporte · Saphety</h1>
+  <nav id="menu" data-activo="emitidos.html"></nav>
+  <div id="banner"></div>
+</header>
+<main>
+  <div class="encabezado">
+    <div>
+      <p class="antetitulo"><a class="enlace-doc" id="volver" href="emitidos.html">← Documento</a> · Nota de ajuste</p>
+      <h1 id="titulo">Nota de ajuste</h1>
+      <p class="ayuda" id="subtitulo"></p>
+    </div>
+  </div>
+  <div id="msg"></div>
+
+  <form id="form" class="oculto" onsubmit="return false">
+    <section class="panel">
+      <h2>Documento soporte original</h2>
+      <dl class="datos" id="original"></dl>
+    </section>
+
+    <section class="panel">
+      <h2>Ajuste</h2>
+      <div class="rejilla">
+        <div><label>Concepto</label><select name="concepto" id="concepto" required></select></div>
+        <div><label>Alcance</label>
+          <select id="alcance">
+            <option value="total">Todo el documento (anulación total)</option>
+            <option value="parcial">Algunas líneas o parte del valor</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label>Motivo</label>
+        <textarea name="motivo" id="motivo" rows="3" maxlength="560" placeholder="Por qué se ajusta el documento (va en las notas de la nota de ajuste)"></textarea>
+        <div class="ayuda"><span id="cuenta">0</span>/560 caracteres.</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Líneas a ajustar</h2>
+      <p class="ayuda">El valor de cada línea es lo que se ajusta, sin IVA; el IVA y las retenciones se recalculan en la misma proporción. No puede superar el valor original.</p>
+      <div id="lineas"></div>
+      <p><b>Total de la nota: <span id="total"></span></b></p>
+      <div class="fila-botones">
+        <button type="button" id="btnEnviar">Enviar nota de ajuste</button>
+        <span class="ayuda" id="serie"></span>
+      </div>
+    </section>
+  </form>
+
+  <section class="panel oculto" id="resultado"></section>
+</main>
+
+<script>
+const id = new URLSearchParams(location.search).get('id') || '';
+const ruta = `/api/emitidos/${encodeURIComponent(id)}/nota-ajuste`;
+const fecha = (iso) => (iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium' }) : '—');
+const dato = (etiqueta, valor) => `<dt>${esc(etiqueta)}</dt><dd>${valor || '—'}</dd>`;
+let datos;
+
+function pintarLineas() {
+  const total = document.getElementById('alcance').value === 'total';
+  document.getElementById('lineas').innerHTML = `<div class="tabla-scroll"><table><thead><tr><th></th><th>#</th><th>Descripción</th><th class="num">Valor original</th><th class="num">IVA %</th><th class="num">Valor a ajustar</th></tr></thead><tbody>
+    ${datos.lineas.map((l, i) => `<tr>
+      <td><input type="checkbox" data-i="${i}" class="sel" checked ${total ? 'disabled' : ''}></td>
+      <td>${esc(l.numero)}</td><td>${esc(l.descripcion)}</td>
+      <td class="num">${pesos(l.valor)}</td><td class="num">${l.ivaPorcentaje == null ? '' : esc(l.ivaPorcentaje)}</td>
+      <td class="num"><input type="number" step="0.01" min="0.01" max="${l.valor}" value="${l.valor}" data-i="${i}" class="valor" style="max-width:140px;text-align:right" ${total ? 'disabled' : ''}></td>
+    </tr>`).join('')}</tbody></table></div>`;
+  document.querySelectorAll('#lineas input').forEach((el) => el.addEventListener('input', calcular));
+  calcular();
+}
+
+/** Líneas elegidas con su valor; en anulación total, todas con su valor original. */
+function lineasElegidas() {
+  const total = document.getElementById('alcance').value === 'total';
+  return datos.lineas.map((l, i) => {
+    if (total) return { numero: l.numero, valor: l.valor };
+    if (!document.querySelector(`.sel[data-i="${i}"]`).checked) return null;
+    return { numero: l.numero, valor: Number(document.querySelector(`.valor[data-i="${i}"]`).value) };
+  }).filter(Boolean);
+}
+
+function calcular() {
+  const suma = lineasElegidas().reduce((s, x) => {
+    const l = datos.lineas.find((y) => y.numero === x.numero);
+    return s + x.valor + (l.valor ? (l.iva * x.valor) / l.valor : 0);
+  }, 0);
+  document.getElementById('total').textContent = `${datos.moneda} ${pesos(suma)}`;
+}
+
+async function cargar() {
+  const msg = document.getElementById('msg');
+  document.getElementById('volver').href = `documento.html?id=${encodeURIComponent(id)}`;
+  msg.innerHTML = '<div class="aviso warn">Consultando el documento en Saphety…</div>';
+  try {
+    datos = await api(ruta);
+    const r = datos.referencia;
+    document.getElementById('titulo').textContent = `Nota de ajuste a ${r.numero}`;
+    document.getElementById('subtitulo').innerHTML = datos.modo === 'real'
+      ? '<span class="chip real">ENVÍO REAL</span> La nota se envía a Saphety y a la DIAN.'
+      : '<span class="chip simulado">Modo simulado</span> Se arma el JSON pero no se envía nada.';
+    document.getElementById('original').innerHTML = [
+      dato('Número', esc(r.numero)),
+      dato('Fecha', esc(fecha(r.fecha))),
+      dato('Proveedor', `${esc(datos.proveedor)}<div class="codigo">${esc(datos.identificacion)}</div>`),
+      dato('CUDS', `<span class="codigo">${esc(r.cuds)}</span>`),
+      dato('Datos tomados de', datos.fuente === 'historial' ? 'El JSON que envió esta app' : 'El documento guardado en Saphety'),
+    ].join('');
+    document.getElementById('concepto').innerHTML = '<option value="">Elige…</option>'
+      + datos.conceptos.map((c) => `<option value="${esc(c.codigo)}">${esc(c.codigo)} · ${esc(c.nombre)}</option>`).join('');
+    const s = datos.serie;
+    document.getElementById('serie').innerHTML = s.configurada
+      ? `Número: <b>${esc(s.prefijo)}${esc(s.siguiente)}</b>${datos.modo === 'real' ? '' : ' (en simulado no se gasta)'}`
+      : '<span style="color:var(--err)">Falta configurar la serie de notas de ajuste en Administración.</span>';
+    document.getElementById('alcance').addEventListener('change', pintarLineas);
+    document.getElementById('concepto').addEventListener('change', (e) => {
+      // Anulación del documento (2) es siempre por el total.
+      if (e.target.value === '2') { document.getElementById('alcance').value = 'total'; pintarLineas(); }
+    });
+    const motivo = document.getElementById('motivo');
+    motivo.addEventListener('input', () => { document.getElementById('cuenta').textContent = motivo.value.length; });
+    pintarLineas();
+    msg.innerHTML = '';
+    document.getElementById('form').classList.remove('oculto');
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err">${esc(e.message)}</div>`;
+  }
+}
+
+async function enviar() {
+  const msg = document.getElementById('msg');
+  const lineas = lineasElegidas();
+  if (!lineas.length) { msg.innerHTML = '<div class="aviso err">Elige al menos una línea.</div>'; return; }
+  let confirmado = false;
+  if (datos.modo === 'real') {
+    confirmado = confirm(`Se enviará una nota de ajuste REAL a ${datos.referencia.numero} por ${document.getElementById('total').textContent}. No se puede deshacer. ¿Continuar?`);
+    if (!confirmado) return;
+  }
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true;
+  msg.innerHTML = '<div class="aviso warn">Enviando…</div>';
+  try {
+    const r = await api(ruta, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ concepto: document.getElementById('concepto').value, motivo: document.getElementById('motivo').value, lineas, confirmado }),
+    });
+    msg.innerHTML = '';
+    const res = document.getElementById('resultado');
+    res.innerHTML = `<h2>Resultado ${chip(r.estado)}</h2>
+      ${r.numero ? `<p>Nota <b>${esc(r.numero)}</b>${r.cuds ? ` · CUDS <span class="codigo">${esc(r.cuds)}</span>` : ''}</p>` : ''}
+      ${r.errores && r.errores.length ? `<ul class="lista-msg err">${r.errores.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>` : ''}
+      ${r.mensaje ? `<p class="ayuda">${esc(r.mensaje)}</p>` : ''}
+      ${r.envioId ? '<p class="ayuda">Quedó registrada en el Historial.</p>' : ''}
+      <details><summary>JSON de la nota</summary><pre>${esc(JSON.stringify(r.json, null, 2))}</pre></details>`;
+    res.classList.remove('oculto');
+    // Una nota real enviada no se vuelve a enviar desde esta pantalla.
+    btn.disabled = r.modo === 'real' && r.estado !== 'con_errores';
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err">${esc(e.message)}</div>`;
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('btnEnviar').addEventListener('click', enviar);
+cargar();
+</script>
+</body>
+</html>

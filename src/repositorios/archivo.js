@@ -80,6 +80,15 @@ function crearAlmacenArchivo(dir) {
       escribir(d);
       return { prefijo: conDefaults(p.config).prefijoConsecutivo, numero: String(n) };
     },
+    /** Reserva el siguiente número de nota de ajuste y lo incrementa (solo envíos reales). */
+    tomarConsecutivoNota: async (id) => {
+      const d = leer();
+      const p = d.perfiles.find((x) => x.id === Number(id));
+      const n = Number(conDefaults(p.config).siguienteNotaAjuste);
+      p.config.siguienteNotaAjuste = n + 1;
+      escribir(d);
+      return { prefijo: conDefaults(p.config).prefijoNotaAjuste, numero: String(n) };
+    },
   };
 
   const envios = {
@@ -106,6 +115,8 @@ function crearAlmacenArchivo(dir) {
         .map(resumenEnvio);
     },
     obtener: async (id) => leerEnvios().find((e) => e.id === Number(id)) || null,
+    /** Último envío real con ese id de Saphety (incluye el JSON enviado), o null. */
+    porSaphetyId: async (saphetyId) => leerEnvios().filter((e) => e.modo === 'real' && e.saphetyId === saphetyId).sort((a, b) => b.id - a.id)[0] || null,
   };
 
   const usuarios = {

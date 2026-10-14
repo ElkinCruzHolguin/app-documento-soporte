@@ -23,6 +23,11 @@ const DEFAULTS = {
   prefijoConsecutivo: 'SEDS',
   siguienteConsecutivo: 984000001,
 
+  // Notas de ajuste al documento soporte (serie propia en Saphety; el número sube con cada nota real)
+  serieExternalKeyNotaAjuste: '',
+  prefijoNotaAjuste: 'NADS',
+  siguienteNotaAjuste: 1,
+
   // Fechas
   fechaEmision: 'excel', // 'excel' -> FECHA_DOC | 'hoy' -> fecha actual (Bogotá)
 
