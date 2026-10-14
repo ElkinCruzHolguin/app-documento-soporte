@@ -5,6 +5,7 @@
 const { fallo } = require('../dominio/errores');
 const { validarId, listaDocumentos, totalBusqueda, TAMANO_PAGINA } = require('../dominio/emitidos');
 const reglas = require('../dominio/recibidos');
+const { urlConsultaDian } = require('../dominio/dian');
 
 const FORMATOS = {
   pdf: { ruta: 'pdf', tipo: 'application/pdf', extension: 'pdf' },
@@ -50,6 +51,7 @@ function crearServicioRecibidos({ companias, perfiles, saphety, log = console })
       const docId = validarId(id);
       const { compania, companyId, llamar } = await conexion(actor);
       const documento = reglas.resumenRecibido(await propio(llamar, companyId, docId));
+      documento.consultaDian = urlConsultaDian(documento.cufe, compania.config.url);
       const avisos = [];
       const respuestas = await llamar('respuestasRecibido', docId).catch((e) => { avisos.push(`No se pudieron consultar las respuestas: ${e.message}`); return null; });
       return {

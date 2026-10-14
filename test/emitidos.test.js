@@ -100,6 +100,7 @@ test('emitidos: lista, detalle y archivos de la compañía, nunca de otra', asyn
     const detalle = await json(`/api/emitidos/${ID_PROPIO}`);
     assert.strictEqual(detalle.status, 200, JSON.stringify(detalle.datos));
     assert.strictEqual(detalle.datos.documento.cuds, 'cuds-123');
+    assert.strictEqual(detalle.datos.documento.consultaDian, 'https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=cuds-123');
     assert.strictEqual(detalle.datos.lineas[0].descripcion, 'GASTOS BANCARIOS');
     assert.strictEqual(detalle.datos.respuestas[0].ResponseCode, '02');
     assert.deepStrictEqual(detalle.datos.avisos, []);
