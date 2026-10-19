@@ -11,6 +11,7 @@ const { crearControladorHistorial } = require('../controladores/historial.contro
 const { crearControladorEmitidos } = require('../controladores/emitidos.controlador');
 const { crearControladorRecibidos } = require('../controladores/recibidos.controlador');
 const { crearControladorDashboard } = require('../controladores/dashboard.controlador');
+const { crearControladorCuenta } = require('../controladores/cuenta.controlador');
 
 function crearRutasApi({ servicios, entorno }) {
   const opciones = { cookieSegura: entorno.enVercel };
@@ -22,6 +23,7 @@ function crearRutasApi({ servicios, entorno }) {
   const emitidos = crearControladorEmitidos(servicios);
   const recibidos = crearControladorRecibidos(servicios);
   const dashboard = crearControladorDashboard(servicios);
+  const cuenta = crearControladorCuenta(servicios);
   const r = express.Router();
   const a = asincrono;
 
@@ -32,6 +34,7 @@ function crearRutasApi({ servicios, entorno }) {
   // Todo lo demás exige sesión
   r.use(requiereSesion(servicios.autenticacion, opciones));
   r.get('/estado', a(sesion.estado));
+  r.post('/cuenta/clave', a(cuenta.cambiarClave));
 
   r.get('/perfiles', a(companias.listar));
   r.post('/perfiles', a(companias.crear));
