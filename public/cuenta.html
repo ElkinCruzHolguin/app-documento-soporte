@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cambiar contraseña</title>
+<link rel="stylesheet" href="app.css">
+<script src="comun.js"></script>
+<style>
+  .cuenta { max-width: 420px; }
+  .cuenta form > div { margin-top: 12px; }
+  .cuenta button { margin-top: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Documentos soporte · Saphety</h1>
+  <nav id="menu" data-activo="cuenta.html"></nav>
+  <div id="banner"></div>
+</header>
+<main>
+  <section class="panel cuenta">
+    <h2>Cambiar contraseña</h2>
+    <p class="ayuda">Escribe tu contraseña actual y la nueva. La nueva debe tener al menos 10 caracteres.</p>
+    <div id="msg"></div>
+    <form id="form">
+      <div><label for="actual">Contraseña actual</label><input id="actual" type="password" autocomplete="current-password" required></div>
+      <div><label for="nueva">Nueva contraseña</label><input id="nueva" type="password" autocomplete="new-password" minlength="10" required></div>
+      <div><label for="confirmar">Confirmar nueva contraseña</label><input id="confirmar" type="password" autocomplete="new-password" minlength="10" required></div>
+      <button type="submit" id="btn">Cambiar contraseña</button>
+    </form>
+  </section>
+</main>
+<script>
+const form = document.getElementById('form');
+const aviso = (tipo, texto) => {
+  const msg = document.getElementById('msg');
+  msg.innerHTML = `<div class="aviso ${tipo}"></div>`;
+  msg.firstChild.textContent = texto;
+};
+form.onsubmit = async (ev) => {
+  ev.preventDefault();
+  const actual = form.actual.value;
+  const nueva = form.nueva.value;
+  if (nueva !== form.confirmar.value) return aviso('err', 'La nueva contraseña y su confirmación no coinciden.');
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  try {
+    await api('/api/cuenta/clave', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actual, nueva }),
+    });
+    form.reset();
+    aviso('ok', 'Tu contraseña se cambió. Úsala la próxima vez que inicies sesión.');
+  } catch (e) {
+    aviso('err', e.message);
+  } finally {
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
