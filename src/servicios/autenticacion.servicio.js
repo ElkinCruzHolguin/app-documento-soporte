@@ -9,6 +9,7 @@
 const crypto = require('node:crypto');
 const { fallo } = require('../dominio/errores');
 const { esCorreo, OTP, mensajeCodigo, enmascararCorreo } = require('../dominio/correo');
+const { companiasDe } = require('../dominio/accesos');
 
 const BLOQUEADO = 'Demasiados intentos fallidos. Espera 15 minutos e inténtalo de nuevo.';
 const PENDIENTE_VENCIDO = 'Tu ingreso venció. Vuelve a escribir tu usuario y contraseña.';
@@ -46,11 +47,15 @@ function crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguri
     return p;
   }
 
-  /** Comprueba que la cuenta sigue activa y con el mismo rol y compañía (para usuarios de compañía). */
+  /**
+   * Comprueba que la cuenta sigue activa, con el mismo rol, y que la compañía de la sesión sigue
+   * siendo una de las suyas (la principal o una ligada).
+   */
   async function sigueValida(d) {
     if (!d.id) return true;
     const u = await usuarios.obtener(d.id);
-    return !!u && u.activo && u.rol === d.rol && (u.perfilId ?? null) === (d.perfilId ?? null) && (!d.usuario || u.usuario === d.usuario);
+    if (!u || !u.activo || u.rol !== d.rol || (d.usuario && u.usuario !== d.usuario)) return false;
+    return u.rol === 'admin' ? d.perfilId == null : companiasDe(u).includes(Number(d.perfilId));
   }
 
   async function emitirSesion(datos) {
@@ -123,6 +128,15 @@ function crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguri
       limitarEnvios(ip, p);
       await enviarCodigo(p);
       return { destino: enmascararCorreo(p.destino) };
+    },
+
+    /** Cambia la compañía con la que trabaja un usuario de compañía (una de las suyas) y emite la sesión nueva. */
+    async cambiarCompania(actor, perfilId) {
+      if (actor.rol === 'admin' || !actor.id) throw fallo(400, 'El administrador elige la compañía en Administración.');
+      const u = await usuarios.obtener(actor.id);
+      const id = Number(perfilId);
+      if (!u || !companiasDe(u).includes(id)) throw fallo(403, 'No tienes acceso a esa compañía.');
+      return { token: firmador.emitir({ id: actor.id, usuario: actor.usuario, rol: actor.rol, perfilId: id }) };
     },
 
     /**

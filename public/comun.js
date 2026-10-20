@@ -77,7 +77,21 @@ async function pintarBanner() {
     const quien = usuario.login
       ? ` · <b>${esc(usuario.usuario)}</b>${esAdmin ? ' (admin)' : ''}${usuario.cambiaClave ? ' · <a href="cuenta.html">Cambiar contraseña</a>' : ''} · <a href="#" id="btnSalir">Salir</a>`
       : '';
-    el.innerHTML = `${perfil ? `Compañía <b>${esc(perfil.nombre)}</b> · ` : ''}${modo}${quien}`;
+    // Usuario ligado a varias compañías (p. ej. QA y producción): elige con cuál trabajar.
+    const otras = usuario.companias || [];
+    const compania = otras.length > 1
+      ? `Compañía <select id="selCompania" aria-label="Compañía">${otras.map((c) => `<option value="${c.id}" ${perfil && c.id === perfil.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select> · `
+      : perfil ? `Compañía <b>${esc(perfil.nombre)}</b> · ` : '';
+    el.innerHTML = `${compania}${modo}${quien}`;
+    const sel = document.getElementById('selCompania');
+    if (sel) {
+      sel.onchange = async () => {
+        try {
+          await api('/api/sesion/compania', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ perfilId: Number(sel.value) }) });
+          location.reload();
+        } catch (e) { alert(e.message); }
+      };
+    }
     const btn = document.getElementById('btnSalir');
     if (btn) btn.onclick = (ev) => { ev.preventDefault(); salir(); };
   } catch (e) {

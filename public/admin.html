@@ -133,6 +133,11 @@
       <div><label for="nuRol">Rol</label><select id="nuRol"><option value="empresa">Compañía</option><option value="admin">Administrador</option></select></div>
       <div id="cajaPerfil"><label for="nuPerfil">Compañía</label><select id="nuPerfil"></select></div>
     </div>
+    <div id="cajaLigadasNuevo">
+      <label style="margin-top:12px">Otras compañías que puede usar</label>
+      <div class="modulos" id="nuLigadas"></div>
+      <div class="ayuda">Opcional. Por ejemplo, ligar Vitro QA y Vitro PRD: el usuario entra en la compañía elegida arriba y cambia de una a otra desde el menú.</div>
+    </div>
     <div id="cajaModulosNuevo">
       <label style="margin-top:12px">Módulos que verá</label>
       <div class="modulos" id="nuModulos"></div>
@@ -149,6 +154,8 @@ const nombreModulo = (c) => (catalogoModulos.find((m) => m.clave === c) || {}).n
 // Módulos habilitados de una compañía (sin configurar = todos).
 const modulosDe = (p) => (p && Array.isArray(p.config.modulos) ? catalogoModulos.map((m) => m.clave).filter((c) => p.config.modulos.includes(c)) : catalogoModulos.map((m) => m.clave));
 const casillas = (claves, marcadas, nombre) => claves.map((c) => `<label><input type="checkbox" name="${nombre}" value="${c}" ${marcadas.includes(c) ? 'checked' : ''}> ${esc(nombreModulo(c))}</label>`).join('');
+const casillasCompanias = (excluir, marcadas, nombre) => perfiles.filter((p) => p.id !== excluir)
+  .map((p) => `<label><input type="checkbox" name="${nombre}" value="${p.id}" ${marcadas.includes(p.id) ? 'checked' : ''}> ${esc(p.nombre)}</label>`).join('') || '<span class="ayuda">No hay otras compañías.</span>';
 const marcadasEn = (contenedor) => [...contenedor.querySelectorAll('input[type=checkbox]:checked')].map((x) => x.value);
 const form = document.getElementById('form');
 const msg = (html, tipo = 'ok') => {
@@ -268,15 +275,16 @@ async function cargarUsuarios() {
       if (!Array.isArray(u.modulos)) return 'Todos los de la compañía';
       return ve.length ? ve.map(nombreModulo).join(', ') : 'Ninguno';
     };
+    const nombreCompania = (id) => (perfiles.find((p) => p.id === id) || {}).nombre || `#${id}`;
     document.getElementById('filasUsuarios').innerHTML = lista.length ? lista.map((u) => `<tr data-id="${u.id}">
       <td><b>${esc(u.usuario)}</b></td>
       <td><select class="selRolU" style="min-width:150px"><option value="empresa">Compañía</option><option value="admin" ${u.rol === 'admin' ? 'selected' : ''}>Administrador</option></select></td>
-      <td>${u.rol === 'admin' ? '— (todas)' : `<select class="selPerfilU" style="max-width:220px">${opcionesPerfil(u.perfilId)}</select>`}</td>
+      <td>${u.rol === 'admin' ? '— (todas)' : `<select class="selPerfilU" style="min-width:160px;max-width:220px">${opcionesPerfil(u.perfilId)}</select>${u.companias.length ? `<div class="ayuda">También: ${u.companias.map((id) => esc(nombreCompania(id))).join(', ')}</div>` : ''}`}</td>
       <td style="max-width:220px">${u.rol === 'admin' ? 'Todos' : esc(resumenModulos(u))}</td>
       <td>${u.activo ? '<span class="chip aceptado">Activo</span>' : '<span class="chip con_errores">Desactivado</span>'}</td>
       <td>${esc(fechaHora(u.ultimoIngreso))}</td>
       <td style="white-space:nowrap">
-        ${u.rol === 'admin' ? '' : '<button class="secundario btnModulos">Módulos</button>'}
+        ${u.rol === 'admin' ? '' : '<button class="secundario btnModulos">Módulos</button> <button class="secundario btnLigadas">Compañías</button>'}
         <button class="secundario btnCorreo">Cambiar correo</button>
         <button class="secundario btnClave">Cambiar contraseña</button>
         <button class="secundario btnActivo">${u.activo ? 'Desactivar' : 'Activar'}</button>
@@ -286,6 +294,11 @@ async function cargarUsuarios() {
         <label><input type="checkbox" class="todos" ${Array.isArray(u.modulos) ? '' : 'checked'} style="width:auto"> Todos los de la compañía (incluye los que se le habiliten después)</label>
         <div class="modulos">${casillas(modulosDe(perfiles.find((p) => p.id === u.perfilId)), Array.isArray(u.modulos) ? u.modulos : modulosDe(perfiles.find((p) => p.id === u.perfilId)), 'moduloU')}</div>
         <div class="fila-botones"><button class="btnGuardarModulos">Guardar módulos</button></div>
+      </td></tr>
+      <tr class="editorLigadas" data-para="${u.id}" hidden><td colspan="7">
+        <label>Otras compañías que puede usar, además de la principal (cambia entre ellas desde el menú)</label>
+        <div class="modulos">${casillasCompanias(u.perfilId, u.companias, 'ligadaU')}</div>
+        <div class="fila-botones"><button class="btnGuardarLigadas">Guardar compañías</button></div>
       </td></tr>`).join('') : '<tr><td colspan="7" class="ayuda">Aún no hay usuarios.</td></tr>';
     for (const tr of document.querySelectorAll('#filasUsuarios tr[data-id]')) {
       const u = lista.find((x) => x.id === Number(tr.dataset.id));
@@ -300,6 +313,13 @@ async function cargarUsuarios() {
       const sincronizar = () => editor.querySelectorAll('.modulos input').forEach((x) => { x.disabled = todos.checked; });
       todos.onchange = sincronizar;
       sincronizar();
+      const ligadas = document.querySelector(`tr.editorLigadas[data-para="${u.id}"]`);
+      const btnLigadas = tr.querySelector('.btnLigadas');
+      if (btnLigadas) btnLigadas.onclick = () => { ligadas.hidden = !ligadas.hidden; };
+      ligadas.querySelector('.btnGuardarLigadas').onclick = () => accion(
+        () => put({ companias: marcadasEn(ligadas.querySelector('.modulos')).map(Number) }),
+        `Compañías de «${esc(u.usuario)}» actualizadas.`,
+      );
       const btnModulos = tr.querySelector('.btnModulos');
       if (btnModulos) btnModulos.onclick = () => { editor.hidden = !editor.hidden; };
       const selRol = tr.querySelector('.selRolU');
@@ -337,12 +357,14 @@ function pintarRolNuevo() {
   const admin = document.getElementById('nuRol').value === 'admin';
   document.getElementById('cajaPerfil').hidden = admin;
   document.getElementById('cajaModulosNuevo').hidden = admin;
+  document.getElementById('cajaLigadasNuevo').hidden = admin;
 }
 document.getElementById('nuRol').onchange = pintarRolNuevo;
 function pintarModulosNuevo() {
   const p = perfiles.find((x) => x.id === Number(document.getElementById('nuPerfil').value));
   const claves = modulosDe(p);
   document.getElementById('nuModulos').innerHTML = casillas(claves, claves, 'nuModulo');
+  document.getElementById('nuLigadas').innerHTML = casillasCompanias(p && p.id, [], 'nuLigada');
 }
 document.getElementById('nuPerfil').onchange = pintarModulosNuevo;
 
@@ -357,6 +379,7 @@ document.getElementById('btnCrearUsuario').onclick = async () => {
   const marcados = marcadasEn(document.getElementById('nuModulos'));
   // Todos marcados = sin restricción (verá también lo que se le habilite después a la compañía).
   cuerpo.modulos = marcados.length === deCompania.length ? null : marcados;
+  cuerpo.companias = marcadasEn(document.getElementById('nuLigadas')).map(Number);
   try {
     const u = await api('/api/usuarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
     msgU(`Usuario «${esc(u.usuario)}» creado. Entrégale estos datos: usuario <b>${esc(u.usuario)}</b>, contraseña <b>${esc(cuerpo.clave)}</b>. Al entrar recibirá un código en ese correo. La contraseña no se volverá a mostrar.`);

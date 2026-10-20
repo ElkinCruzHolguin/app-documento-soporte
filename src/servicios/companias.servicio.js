@@ -3,6 +3,7 @@
 // Solo el administrador las crea y modifica; un usuario de compañía consulta la suya en solo lectura.
 const { fallo } = require('../dominio/errores');
 const { limpiarModulos } = require('../dominio/modulos');
+const { companiasDe } = require('../dominio/accesos');
 
 const esAdmin = (actor) => actor.rol === 'admin';
 const CAMPOS_NUMERICOS = ['siguienteConsecutivo'];
@@ -24,7 +25,7 @@ function limpiarConfig(entrada) {
   return c;
 }
 
-function crearServicioCompanias({ perfiles, saphety }) {
+function crearServicioCompanias({ perfiles, usuarios, saphety }) {
   const exigirAdmin = (actor) => {
     if (!esAdmin(actor)) throw fallo(403, 'Solo el administrador puede modificar compañías y usuarios.');
   };
@@ -52,6 +53,17 @@ function crearServicioCompanias({ perfiles, saphety }) {
           : 'Tu usuario no tiene una compañía asignada. Contacta al administrador.');
       }
       return p;
+    },
+
+    /**
+     * Compañías entre las que el usuario puede cambiarse ({ id, nombre }), la principal primero.
+     * Vacío para el administrador (él elige en Administración).
+     */
+    async disponibles(actor) {
+      if (esAdmin(actor) || !actor.id) return [];
+      const ids = companiasDe(await usuarios.obtener(actor.id));
+      const lista = await Promise.all(ids.map((id) => perfiles.obtener(id)));
+      return lista.filter(Boolean).map((p) => ({ id: p.id, nombre: p.nombre }));
     },
 
     async listar(actor) {
@@ -83,6 +95,9 @@ function crearServicioCompanias({ perfiles, saphety }) {
       exigirAdmin(actor);
       const p = await existente(id);
       if (p.activo) throw fallo(400, 'No se puede eliminar la compañía con la que estás trabajando.');
+      if ((await usuarios.listar()).some((u) => companiasDe(u).includes(p.id))) {
+        throw fallo(400, 'La compañía tiene usuarios asignados o ligados: quítasela a esos usuarios primero.');
+      }
       await perfiles.eliminar(p.id);
     },
 

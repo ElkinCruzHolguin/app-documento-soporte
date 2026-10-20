@@ -40,10 +40,16 @@ function crearControladorSesion({ autenticacion, companias, modulos }, { cookieS
       res.json(modulos.catalogo());
     },
 
+    /** El usuario de compañía cambia de compañía (p. ej. de QA a producción). */
+    async cambiarCompania(req, res) {
+      const { token } = await autenticacion.cambiarCompania(req.usuario, (req.body || {}).perfilId);
+      res.set('Set-Cookie', seguridad.cookieSesion(token, { segura: cookieSegura })).json({ ok: true });
+    },
+
     async estado(req, res) {
-      const [p, mods] = await Promise.all([companias.deActor(req.usuario), modulos.deActor(req.usuario)]);
+      const [p, mods, otras] = await Promise.all([companias.deActor(req.usuario), modulos.deActor(req.usuario), companias.disponibles(req.usuario)]);
       res.json({
-        usuario: { usuario: req.usuario.usuario, rol: req.usuario.rol, login: autenticacion.activa, modulos: mods, cambiaClave: !!req.usuario.id },
+        usuario: { usuario: req.usuario.usuario, rol: req.usuario.rol, login: autenticacion.activa, modulos: mods, cambiaClave: !!req.usuario.id, companias: otras },
         perfil: p && { id: p.id, nombre: p.nombre, modoEnvio: p.config.modoEnvio, url: p.config.url, numeracion: p.config.numeracion },
       });
     },
