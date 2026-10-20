@@ -8,9 +8,9 @@ const COOKIE = 'ds_sesion';
 // Segundo paso del inicio de sesión: contraseña correcta, falta el código del correo.
 const COOKIE_PENDIENTE = 'ds_2fa';
 const DURACION_PENDIENTE_MS = 10 * 60 * 1000;
-// Navegador de confianza: tras validar el código, durante 30 días ese navegador entra solo con contraseña.
+// Navegador de confianza: tras validar el código, durante 7 días ese navegador entra solo con contraseña.
 const COOKIE_CONFIANZA = 'ds_equipo';
-const DURACION_CONFIANZA_MS = 30 * 24 * 60 * 60 * 1000;
+const DURACION_CONFIANZA_MS = 7 * 24 * 60 * 60 * 1000;
 
 function hashClave(clave) {
   const sal = crypto.randomBytes(16);

@@ -6,7 +6,7 @@
 // deja un estado «pendiente» (cookie firmada aparte, 10 minutos), envía un código de un solo uso (OTP)
 // al correo de la cuenta, y solo al validar el código emite la cookie de sesión.
 // Sin envío de correos configurado (o una cuenta sin correo) se entra solo con contraseña, como antes.
-// Al validar el código se puede recordar el navegador 30 días: ahí se entra solo con contraseña. Cambiar la
+// Al validar el código se puede recordar el navegador 7 días: ahí se entra solo con contraseña. Cambiar la
 // contraseña o el correo de la cuenta invalida los navegadores recordados.
 const crypto = require('node:crypto');
 const { fallo } = require('../dominio/errores');
@@ -118,7 +118,7 @@ function crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguri
 
     /**
      * Paso 2: valida el código del correo y emite la sesión. Cada código sirve una vez, vence en 10 minutos y admite 5 intentos.
-     * Con recordar, devuelve también el token del navegador de confianza (30 días).
+     * Con recordar, devuelve también el token del navegador de confianza (7 días).
      */
     async verificarCodigo({ pendiente: token, codigo, ip, recordar }) {
       const p = leerPendiente(token);

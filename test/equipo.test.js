@@ -1,5 +1,5 @@
 'use strict';
-// Navegador de confianza: tras validar el código, ese navegador entra 30 días solo con contraseña.
+// Navegador de confianza: tras validar el código, ese navegador entra 7 días solo con contraseña.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
