@@ -63,7 +63,7 @@ test('login, roles y aislamiento entre compañías', async () => {
     assert.strictEqual((await crearUsuario({ usuario: 'vitro@ejemplo.com', clave: 'corta', perfilId: vitro.id })).status, 400);
     assert.strictEqual((await crearUsuario({ usuario: 'jefe', clave: 'clave-larga-123', perfilId: vitro.id })).status, 400);
     assert.strictEqual((await crearUsuario({ usuario: 'sinperfil@ejemplo.com', clave: 'clave-larga-123' })).status, 400);
-    assert.strictEqual((await crearUsuario({ usuario: 'otroadmin@ejemplo.com', clave: 'clave-larga-123', rol: 'admin' })).status, 400);
+    assert.strictEqual((await crearUsuario({ usuario: 'otro@ejemplo.com', clave: 'clave-larga-123', rol: 'superusuario', perfilId: vitro.id })).status, 400);
     const uVitro = (await crearUsuario({ usuario: 'Vitro@Ejemplo.com', clave: 'clave-vitro-123', perfilId: vitro.id })).datos;
     assert.strictEqual(uVitro.usuario, 'vitro@ejemplo.com');
     assert.ok(!JSON.stringify(uVitro).includes('scrypt'));

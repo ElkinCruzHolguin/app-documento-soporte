@@ -43,7 +43,7 @@ function crearControladorSesion({ autenticacion, companias, modulos }, { cookieS
     async estado(req, res) {
       const [p, mods] = await Promise.all([companias.deActor(req.usuario), modulos.deActor(req.usuario)]);
       res.json({
-        usuario: { usuario: req.usuario.usuario, rol: req.usuario.rol, login: autenticacion.activa, modulos: mods },
+        usuario: { usuario: req.usuario.usuario, rol: req.usuario.rol, login: autenticacion.activa, modulos: mods, cambiaClave: !!req.usuario.id },
         perfil: p && { id: p.id, nombre: p.nombre, modoEnvio: p.config.modoEnvio, url: p.config.url, numeracion: p.config.numeracion },
       });
     },

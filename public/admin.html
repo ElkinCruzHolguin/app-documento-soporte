@@ -116,7 +116,7 @@
 
   <section class="panel" id="panelUsuarios">
     <h2>Usuarios</h2>
-    <p class="ayuda">Un usuario de compañía solo trabaja con su compañía: carga y envía con ella y solo ve su historial. Puede ver la configuración de su compañía en esta pantalla, pero solo tú (administrador) puedes modificarla.</p>
+    <p class="ayuda">Un usuario de compañía solo trabaja con su compañía: carga y envía con ella y solo ve su historial. Puede ver la configuración de su compañía en esta pantalla, pero solo un administrador puede modificarla. Un usuario administrador tiene los mismos permisos que tú: todas las compañías, todos los módulos y la gestión de usuarios.</p>
     <div id="msgUsuarios"></div>
     <div class="tabla-scroll">
       <table>
@@ -130,11 +130,14 @@
         <div class="ayuda">Entra con este correo y su contraseña; luego recibe aquí un código para terminar de entrar.</div></div>
       <div><label for="nuClave">Contraseña (mínimo 10 caracteres)</label><input id="nuClave" autocomplete="new-password">
         <div class="ayuda"><a href="#" id="btnGenerar">Generar una segura</a> · cópiala y entrégala a la compañía: después no se puede ver.</div></div>
+      <div><label for="nuRol">Rol</label><select id="nuRol"><option value="empresa">Compañía</option><option value="admin">Administrador</option></select></div>
       <div id="cajaPerfil"><label for="nuPerfil">Compañía</label><select id="nuPerfil"></select></div>
     </div>
-    <label style="margin-top:12px">Módulos que verá</label>
-    <div class="modulos" id="nuModulos"></div>
-    <div class="ayuda">Solo aparecen los módulos habilitados en la compañía elegida.</div>
+    <div id="cajaModulosNuevo">
+      <label style="margin-top:12px">Módulos que verá</label>
+      <div class="modulos" id="nuModulos"></div>
+      <div class="ayuda">Solo aparecen los módulos habilitados en la compañía elegida.</div>
+    </div>
     <div class="fila-botones"><button type="button" id="btnCrearUsuario">Crear usuario</button></div>
   </section>
 </main>
@@ -267,13 +270,13 @@ async function cargarUsuarios() {
     };
     document.getElementById('filasUsuarios').innerHTML = lista.length ? lista.map((u) => `<tr data-id="${u.id}">
       <td><b>${esc(u.usuario)}</b></td>
-      <td>${u.rol === 'admin' ? 'Administrador' : 'Compañía'}</td>
-      <td>${u.rol === 'admin' ? '— (todos)' : `<select class="selPerfilU" style="max-width:220px">${opcionesPerfil(u.perfilId)}</select>`}</td>
-      <td style="max-width:220px">${esc(resumenModulos(u))}</td>
+      <td><select class="selRolU" style="min-width:150px"><option value="empresa">Compañía</option><option value="admin" ${u.rol === 'admin' ? 'selected' : ''}>Administrador</option></select></td>
+      <td>${u.rol === 'admin' ? '— (todas)' : `<select class="selPerfilU" style="max-width:220px">${opcionesPerfil(u.perfilId)}</select>`}</td>
+      <td style="max-width:220px">${u.rol === 'admin' ? 'Todos' : esc(resumenModulos(u))}</td>
       <td>${u.activo ? '<span class="chip aceptado">Activo</span>' : '<span class="chip con_errores">Desactivado</span>'}</td>
       <td>${esc(fechaHora(u.ultimoIngreso))}</td>
       <td style="white-space:nowrap">
-        <button class="secundario btnModulos">Módulos</button>
+        ${u.rol === 'admin' ? '' : '<button class="secundario btnModulos">Módulos</button>'}
         <button class="secundario btnCorreo">Cambiar correo</button>
         <button class="secundario btnClave">Cambiar contraseña</button>
         <button class="secundario btnActivo">${u.activo ? 'Desactivar' : 'Activar'}</button>
@@ -297,7 +300,20 @@ async function cargarUsuarios() {
       const sincronizar = () => editor.querySelectorAll('.modulos input').forEach((x) => { x.disabled = todos.checked; });
       todos.onchange = sincronizar;
       sincronizar();
-      tr.querySelector('.btnModulos').onclick = () => { editor.hidden = !editor.hidden; };
+      const btnModulos = tr.querySelector('.btnModulos');
+      if (btnModulos) btnModulos.onclick = () => { editor.hidden = !editor.hidden; };
+      const selRol = tr.querySelector('.selRolU');
+      selRol.onchange = () => {
+        const aAdmin = selRol.value === 'admin';
+        const pregunta = aAdmin
+          ? `¿Hacer administrador a «${u.usuario}»? Podrá ver y modificar todas las compañías y gestionar usuarios.`
+          : `¿Quitarle el rol de administrador a «${u.usuario}»? Quedará como usuario de la compañía «${perfiles[0] ? perfiles[0].nombre : ''}»; después puedes cambiarla.`;
+        if (!confirm(pregunta)) { selRol.value = u.rol; return; }
+        accion(
+          () => put(aAdmin ? { rol: 'admin' } : { rol: 'empresa', perfilId: perfiles[0] && perfiles[0].id }),
+          aAdmin ? `«${esc(u.usuario)}» ahora es administrador.` : `«${esc(u.usuario)}» ya no es administrador. Revisa su compañía y sus módulos.`,
+        );
+      };
       editor.querySelector('.btnGuardarModulos').onclick = () => accion(
         () => put({ modulos: todos.checked ? null : marcadasEn(editor.querySelector('.modulos')) }),
         `Módulos de «${esc(u.usuario)}» actualizados.`,
@@ -317,6 +333,12 @@ async function cargarUsuarios() {
 }
 
 // Casillas del usuario nuevo: los módulos de la compañía elegida, todos marcados.
+function pintarRolNuevo() {
+  const admin = document.getElementById('nuRol').value === 'admin';
+  document.getElementById('cajaPerfil').hidden = admin;
+  document.getElementById('cajaModulosNuevo').hidden = admin;
+}
+document.getElementById('nuRol').onchange = pintarRolNuevo;
 function pintarModulosNuevo() {
   const p = perfiles.find((x) => x.id === Number(document.getElementById('nuPerfil').value));
   const claves = modulosDe(p);
@@ -328,8 +350,9 @@ document.getElementById('btnGenerar').onclick = (ev) => { ev.preventDefault(); d
 document.getElementById('btnCrearUsuario').onclick = async () => {
   const cuerpo = {
     usuario: document.getElementById('nuUsuario').value, clave: document.getElementById('nuClave').value,
-    rol: 'empresa', perfilId: Number(document.getElementById('nuPerfil').value),
+    rol: document.getElementById('nuRol').value, perfilId: Number(document.getElementById('nuPerfil').value),
   };
+  if (cuerpo.rol === 'admin' && !confirm(`¿Crear «${cuerpo.usuario}» como administrador? Podrá ver y modificar todas las compañías y gestionar usuarios.`)) return;
   const deCompania = modulosDe(perfiles.find((p) => p.id === cuerpo.perfilId));
   const marcados = marcadasEn(document.getElementById('nuModulos'));
   // Todos marcados = sin restricción (verá también lo que se le habilite después a la compañía).

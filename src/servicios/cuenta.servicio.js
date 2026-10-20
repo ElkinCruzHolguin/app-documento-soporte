@@ -1,5 +1,5 @@
 'use strict';
-// Cuenta del usuario conectado: un usuario de compañía cambia su propia contraseña.
+// Cuenta del usuario conectado: cada usuario de la tabla (de compañía o administrador) cambia su propia contraseña.
 // La del super administrador es APP_CLAVE y se cambia en las variables de entorno.
 const { fallo } = require('../dominio/errores');
 
@@ -7,7 +7,7 @@ function crearServicioCuenta({ usuarios, seguridad }) {
   return {
     /** Exige la contraseña actual. 5 intentos fallidos bloquean el cambio 15 minutos. */
     async cambiarClave(actor, { actual, nueva }) {
-      if (actor.rol === 'admin' || !actor.id) {
+      if (!actor.id) {
         throw fallo(400, 'La contraseña del administrador se cambia en Vercel (variable APP_CLAVE).');
       }
       const llave = `cuenta|${actor.id}`;

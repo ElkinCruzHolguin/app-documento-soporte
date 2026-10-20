@@ -75,7 +75,7 @@ async function pintarBanner() {
     const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>'
       : perfil.modoEnvio === 'real' ? '<span class="chip real">ENVÍO REAL</span>' : '<span class="chip simulado">Modo simulado</span>';
     const quien = usuario.login
-      ? ` · <b>${esc(usuario.usuario)}</b>${esAdmin ? ' (admin)' : ' · <a href="cuenta.html">Cambiar contraseña</a>'} · <a href="#" id="btnSalir">Salir</a>`
+      ? ` · <b>${esc(usuario.usuario)}</b>${esAdmin ? ' (admin)' : ''}${usuario.cambiaClave ? ' · <a href="cuenta.html">Cambiar contraseña</a>' : ''} · <a href="#" id="btnSalir">Salir</a>`
       : '';
     el.innerHTML = `${perfil ? `Compañía <b>${esc(perfil.nombre)}</b> · ` : ''}${modo}${quien}`;
     const btn = document.getElementById('btnSalir');
