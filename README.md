@@ -18,7 +18,7 @@ Las variables están documentadas en `.env.example`. Copia ese archivo como `.en
 1. **Supabase**: en el SQL Editor ejecuta `supabase/esquema.sql`. Crea las tablas `perfiles` y `envios` con RLS activo y sin políticas: solo el servidor, con la service_role key, puede leerlas.
 2. **Vercel**: importa el repositorio de GitHub (Framework: Other) y en *Settings → Environment Variables* define:
    - `APP_USUARIO`, `APP_CLAVE`: super administrador de la app. Sin ellas, la app en Vercel no atiende.
-   - `APP_CORREO`, `RESEND_API_KEY`, `CORREO_REMITENTE`: ingreso con código al correo (ver `.env.example`).
+   - `APP_CORREO`, `CORREO_REMITENTE`, `MAILGUN_API_KEY`, `MAILGUN_DOMINIO` (o `RESEND_API_KEY`): ingreso con código al correo (ver `.env.example`).
    - `APP_SECRETO`: llave larga y aleatoria para cifrar la contraseña de Saphety. No la cambies después.
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`: en Supabase, *Project Settings → API*.
 3. Cada push a `main` despliega de nuevo. Las páginas (`public/`) las sirve Vercel y la API corre en `api/index.js` (ver `vercel.json`). Vercel limita las peticiones a 4,5 MB, así que el Excel debe pesar menos.
@@ -28,7 +28,7 @@ La contraseña de Saphety se escribe en Administración, se guarda cifrada (AES-
 
 ## Usuarios y acceso
 - Se entra por `login.html`; la sesión (cookie firmada, HttpOnly) dura 12 horas. Hay dos formas:
-  - **Código al correo (OTP)**, la forma principal: el usuario escribe su correo, recibe un código de 6 dígitos que vence en 10 minutos, sirve una sola vez y admite 5 intentos. Solo se guarda el hash del código (tabla `codigos_acceso`). Necesita `RESEND_API_KEY` y `CORREO_REMITENTE`; sin ellas la pantalla solo ofrece contraseña.
+  - **Código al correo (OTP)**, la forma principal: el usuario escribe su correo, recibe un código de 6 dígitos que vence en 10 minutos, sirve una sola vez y admite 5 intentos. Solo se guarda el hash del código (tabla `codigos_acceso`). Necesita Mailgun (`MAILGUN_API_KEY`, `MAILGUN_DOMINIO`) o Resend (`RESEND_API_KEY`), más `CORREO_REMITENTE`; sin ellas la pantalla solo ofrece contraseña.
   - **Usuario y contraseña**, como respaldo (por ejemplo, si el correo falla).
 - **Super administrador**: `APP_USUARIO`/`APP_CLAVE`, o código a `APP_CORREO`. Ve todo y es el único que crea o modifica compañías y usuarios.
 - **Compañías**: solo el super administrador las crea y modifica (Administración › «Nueva compañía»). Cada una tiene su conexión con Saphety, sus parámetros, sus usuarios y su historial.

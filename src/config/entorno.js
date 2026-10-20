@@ -18,6 +18,9 @@ function leerEntorno(env = process.env) {
     correoAdmin: String(env.APP_CORREO || '').trim().toLowerCase(), // correo del super administrador (opcional)
     correo: {
       llaveResend: env.RESEND_API_KEY || '',
+      llaveMailgun: env.MAILGUN_API_KEY || '',
+      dominioMailgun: env.MAILGUN_DOMINIO || '',
+      regionMailgun: String(env.MAILGUN_REGION || 'us').toLowerCase(), // 'us' o 'eu', según la región de la cuenta
       remitente: env.CORREO_REMITENTE || '',
     },
   };

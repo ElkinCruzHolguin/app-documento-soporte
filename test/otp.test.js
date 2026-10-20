@@ -23,7 +23,7 @@ test('formato del correo', () => {
   for (const malo of ['vitro', 'a@b', '@vitro.com', 'a b@vitro.com', '']) assert.ok(!esCorreo(malo), malo);
 });
 
-test('enviador de correo: Resend, local y Vercel sin configurar', async () => {
+test('enviador de correo: Mailgun, Resend, local y Vercel sin configurar', async () => {
   const llamadas = [];
   const resend = crearEnviadorCorreo({ correo: { llaveResend: 're_x', remitente: 'App <no-responder@zupplio.app>' } }, {
     fetch: async (url, op) => { llamadas.push({ url, op }); return { ok: true }; },
@@ -33,6 +33,20 @@ test('enviador de correo: Resend, local y Vercel sin configurar', async () => {
   assert.strictEqual(llamadas[0].url, 'https://api.resend.com/emails');
   assert.strictEqual(llamadas[0].op.headers.Authorization, 'Bearer re_x');
   assert.deepStrictEqual(JSON.parse(llamadas[0].op.body).to, ['a@b.co']);
+
+  const mg = [];
+  const mailgun = crearEnviadorCorreo({ correo: { llaveMailgun: 'key-x', dominioMailgun: 'zupplio.app', regionMailgun: 'us', remitente: 'App <no-responder@zupplio.app>' } }, {
+    fetch: async (url, op) => { mg.push({ url, op }); return { ok: true }; },
+  });
+  await mailgun.enviar({ para: 'a@b.co', asunto: 'Hola', texto: 't', html: '<p>t</p>' });
+  assert.strictEqual(mg[0].url, 'https://api.mailgun.net/v3/zupplio.app/messages');
+  assert.strictEqual(mg[0].op.headers.Authorization, `Basic ${Buffer.from('api:key-x').toString('base64')}`);
+  assert.strictEqual(mg[0].op.body.get('to'), 'a@b.co');
+  assert.strictEqual(mg[0].op.body.get('from'), 'App <no-responder@zupplio.app>');
+  const mgEu = [];
+  await crearEnviadorCorreo({ correo: { llaveMailgun: 'k', dominioMailgun: 'zupplio.app', regionMailgun: 'eu', remitente: 'x@zupplio.app' } }, { fetch: async (url) => { mgEu.push(url); return { ok: true }; } })
+    .enviar({ para: 'a@b.co', asunto: 'x' });
+  assert.match(mgEu[0], /^https:\/\/api\.eu\.mailgun\.net\//);
 
   const fallaResend = crearEnviadorCorreo({ correo: { llaveResend: 're_x', remitente: 'x@y.co' } }, { fetch: async () => ({ ok: false, status: 403, text: async () => 'dominio' }) });
   await assert.rejects(fallaResend.enviar({ para: 'a@b.co', asunto: 'x' }), /HTTP 403/);
