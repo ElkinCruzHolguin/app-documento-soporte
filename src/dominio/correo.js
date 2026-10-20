@@ -13,9 +13,9 @@ const OTP = { digitos: 6, vigenciaMs: 10 * 60 * 1000, intentos: 5 };
 function mensajeCodigo(codigo) {
   const minutos = OTP.vigenciaMs / 60000;
   return {
-    asunto: `Tu código de acceso: ${codigo}`,
-    texto: `Tu código para entrar a Documentos soporte es ${codigo}.\n\nVence en ${minutos} minutos y solo sirve una vez. Si no lo pediste, ignora este correo.`,
-    html: `<p>Tu código para entrar a <b>Documentos soporte</b> es:</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${codigo}</p><p>Vence en ${minutos} minutos y solo sirve una vez. Si no lo pediste, ignora este correo.</p>`,
+    asunto: `Tu código de acceso a Zupplio: ${codigo}`,
+    texto: `Tu código para entrar a Zupplio es ${codigo}.\n\nVence en ${minutos} minutos y solo sirve una vez. Si no lo pediste, ignora este correo.`,
+    html: `<p>Tu código para entrar a <b>Zupplio</b> es:</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${codigo}</p><p>Vence en ${minutos} minutos y solo sirve una vez. Si no lo pediste, ignora este correo.</p>`,
   };
 }
 
