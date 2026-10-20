@@ -1,10 +1,12 @@
 'use strict';
 // Usuarios de las compañías. Solo el administrador los gestiona. Los usuarios creados aquí
 // son siempre de compañía: el único administrador es APP_USUARIO.
+// El usuario es el correo: con él se recibe el código de acceso. La contraseña es opcional (respaldo).
+const crypto = require('node:crypto');
 const { fallo } = require('../dominio/errores');
+const { esCorreo, normalizarCorreo } = require('../dominio/correo');
 
 const ROLES = ['empresa'];
-const FORMATO_USUARIO = /^[a-z0-9._@-]{3,60}$/;
 
 function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
   const exigirAdmin = (actor) => {
@@ -16,6 +18,11 @@ function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
   }
   function validarClave(clave) {
     if (String(clave || '').length < 10) throw fallo(400, 'La contraseña debe tener al menos 10 caracteres.');
+  }
+  function validarCorreo(correo) {
+    if (!esCorreo(correo)) throw fallo(400, 'El usuario debe ser un correo válido (p. ej. nombre@empresa.com).');
+    const reservados = [entorno.usuarioAdmin, entorno.correoAdmin].filter(Boolean).map((x) => x.toLowerCase());
+    if (reservados.includes(correo)) throw fallo(400, 'Ese nombre está reservado para el super administrador.');
   }
   async function existente(id) {
     const u = await usuarios.obtener(id);
@@ -29,20 +36,27 @@ function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
       return usuarios.listar();
     },
 
+    /** Sin contraseña, el usuario entra solo con el código que le llega al correo. */
     async crear(actor, { usuario, clave, rol = 'empresa', perfilId }) {
       exigirAdmin(actor);
-      const nombre = String(usuario || '').trim().toLowerCase();
-      if (!FORMATO_USUARIO.test(nombre)) throw fallo(400, 'El usuario debe tener entre 3 y 60 caracteres: letras, números, punto, guion, guion bajo o @.');
-      if (entorno.usuarioAdmin && nombre === entorno.usuarioAdmin.toLowerCase()) throw fallo(400, 'Ese nombre está reservado para el super administrador.');
-      validarClave(clave);
+      const nombre = normalizarCorreo(usuario);
+      validarCorreo(nombre);
+      if (clave) validarClave(clave);
       await validarRolYCompania(rol, Number(perfilId));
-      return usuarios.crear({ usuario: nombre, claveHash: seguridad.hashClave(clave), rol, perfilId: Number(perfilId) });
+      // Sin contraseña se guarda el hash de una aleatoria que nadie conoce: así no se puede entrar con clave.
+      const claveHash = seguridad.hashClave(clave || crypto.randomBytes(32).toString('base64url'));
+      return usuarios.crear({ usuario: nombre, claveHash, rol, perfilId: Number(perfilId) });
     },
 
     async actualizar(actor, id, datos) {
       exigirAdmin(actor);
       const actual = await existente(id);
       const cambios = {};
+      // Cambiar el usuario (p. ej. pasar de «vitro» a su correo) cierra su sesión.
+      if (datos.usuario != null && normalizarCorreo(datos.usuario) !== actual.usuario) {
+        cambios.usuario = normalizarCorreo(datos.usuario);
+        validarCorreo(cambios.usuario);
+      }
       if (datos.clave) {
         validarClave(datos.clave);
         cambios.claveHash = seguridad.hashClave(datos.clave);

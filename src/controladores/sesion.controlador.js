@@ -1,5 +1,5 @@
 'use strict';
-// Inicio y cierre de sesión, y estado del usuario conectado.
+// Inicio de sesión (contraseña o código al correo), cierre y estado del usuario conectado.
 const seguridad = require('../infraestructura/seguridad');
 
 function crearControladorSesion({ autenticacion, companias }, { cookieSegura }) {
@@ -8,6 +8,22 @@ function crearControladorSesion({ autenticacion, companias }, { cookieSegura }) 
       const { usuario, clave } = req.body || {};
       const { token, rol } = await autenticacion.iniciarSesion({ usuario, clave, ip: req.ip });
       if (token) res.set('Set-Cookie', seguridad.cookieSesion(token, { segura: cookieSegura }));
+      res.json({ ok: true, rol });
+    },
+
+    opciones(req, res) {
+      res.json(autenticacion.opciones());
+    },
+
+    async solicitarCodigo(req, res) {
+      const { correo } = req.body || {};
+      res.json({ ok: true, ...(await autenticacion.solicitarCodigo({ correo, ip: req.ip })) });
+    },
+
+    async verificarCodigo(req, res) {
+      const { correo, codigo } = req.body || {};
+      const { token, rol } = await autenticacion.verificarCodigo({ correo, codigo, ip: req.ip });
+      res.set('Set-Cookie', seguridad.cookieSesion(token, { segura: cookieSegura }));
       res.json({ ok: true, rol });
     },
 

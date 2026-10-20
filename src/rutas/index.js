@@ -29,6 +29,9 @@ function crearRutasApi({ servicios, entorno }) {
 
   // Públicas
   r.post('/login', a(sesion.iniciar));
+  r.get('/login/opciones', sesion.opciones);
+  r.post('/login/codigo', a(sesion.solicitarCodigo));
+  r.post('/login/verificar', a(sesion.verificarCodigo));
   r.post('/logout', sesion.cerrar);
 
   // Todo lo demás exige sesión

@@ -120,9 +120,10 @@
     </div>
     <h3>Nuevo usuario</h3>
     <div class="rejilla">
-      <div><label for="nuUsuario">Usuario</label><input id="nuUsuario" autocomplete="off" placeholder="p. ej. vitro"></div>
-      <div><label for="nuClave">Contraseña (mínimo 10 caracteres)</label><input id="nuClave" autocomplete="new-password">
-        <div class="ayuda"><a href="#" id="btnGenerar">Generar una segura</a> · cópiala y entrégala a la compañía: después no se puede ver.</div></div>
+      <div><label for="nuUsuario">Correo (es el usuario)</label><input id="nuUsuario" type="email" autocomplete="off" placeholder="nombre@empresa.com">
+        <div class="ayuda">Entra con un código de acceso que le llega a este correo.</div></div>
+      <div><label for="nuClave">Contraseña (opcional, mínimo 10 caracteres)</label><input id="nuClave" autocomplete="new-password">
+        <div class="ayuda">Solo como respaldo para entrar sin código. <a href="#" id="btnGenerar">Generar una segura</a> · después no se puede ver.</div></div>
       <div id="cajaPerfil"><label for="nuPerfil">Compañía</label><select id="nuPerfil"></select></div>
     </div>
     <div class="fila-botones"><button type="button" id="btnCrearUsuario">Crear usuario</button></div>
@@ -244,6 +245,7 @@ async function cargarUsuarios() {
       <td>${u.activo ? '<span class="chip aceptado">Activo</span>' : '<span class="chip con_errores">Desactivado</span>'}</td>
       <td>${esc(fechaHora(u.ultimoIngreso))}</td>
       <td style="white-space:nowrap">
+        <button class="secundario btnCorreo">Cambiar correo</button>
         <button class="secundario btnClave">Cambiar contraseña</button>
         <button class="secundario btnActivo">${u.activo ? 'Desactivar' : 'Activar'}</button>
         <button class="peligro btnBorrar">Eliminar</button>
@@ -255,6 +257,10 @@ async function cargarUsuarios() {
       tr.querySelector('.btnClave').onclick = () => {
         const clave = prompt(`Nueva contraseña para «${u.usuario}» (mínimo 10 caracteres):`, claveAleatoria());
         if (clave) accion(() => put({ clave }), `Contraseña de «${esc(u.usuario)}» actualizada. Entrégasela: <b>${esc(clave)}</b>`);
+      };
+      tr.querySelector('.btnCorreo').onclick = () => {
+        const usuario = prompt(`Nuevo correo para «${u.usuario}». Será su usuario para entrar:`, u.usuario.includes('@') ? u.usuario : '');
+        if (usuario) accion(() => put({ usuario }), `«${esc(u.usuario)}» ahora entra con el correo <b>${esc(usuario.trim().toLowerCase())}</b>.`);
       };
       tr.querySelector('.btnActivo').onclick = () => accion(() => put({ activo: !u.activo }), `Usuario «${esc(u.usuario)}» ${u.activo ? 'desactivado' : 'activado'}.`);
       tr.querySelector('.btnBorrar').onclick = () => {
@@ -274,7 +280,9 @@ document.getElementById('btnCrearUsuario').onclick = async () => {
   };
   try {
     const u = await api('/api/usuarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
-    msgU(`Usuario «${esc(u.usuario)}» creado. Entrégale estos datos: usuario <b>${esc(u.usuario)}</b>, contraseña <b>${esc(cuerpo.clave)}</b>. La contraseña no se volverá a mostrar.`);
+    msgU(cuerpo.clave
+      ? `Usuario «${esc(u.usuario)}» creado. Entra con un código que le llega a su correo; como respaldo, usuario <b>${esc(u.usuario)}</b> y contraseña <b>${esc(cuerpo.clave)}</b> (no se volverá a mostrar).`
+      : `Usuario «${esc(u.usuario)}» creado. Entra con un código de acceso que le llega a ese correo.`);
     document.getElementById('nuUsuario').value = '';
     document.getElementById('nuClave').value = '';
     await cargarUsuarios();

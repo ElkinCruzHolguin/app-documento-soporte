@@ -115,6 +115,7 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
       .insert({ usuario, clave_hash: claveHash, rol, perfil_id: perfilId ?? null }).select('*').single()))),
     actualizar: async (id, c) => {
       const cambios = {};
+      if ('usuario' in c) cambios.usuario = c.usuario;
       if ('claveHash' in c) cambios.clave_hash = c.claveHash;
       if ('rol' in c) cambios.rol = c.rol;
       if ('perfilId' in c) cambios.perfil_id = c.perfilId;
@@ -125,7 +126,24 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
     eliminar: async (id) => { revisar(await db.from('usuarios').delete().eq('id', Number(id))); },
   };
 
-  return { tipo: 'supabase', perfiles, envios, usuarios };
+  // Códigos de acceso (OTP). Solo se guarda el hash del código.
+  const aCodigo = (f) => f && ({ id: f.id, correo: f.correo, codigoHash: f.codigo_hash, expiraEn: f.expira_en, intentos: f.intentos, usado: f.usado, creadoEn: f.creado_en });
+  const codigos = {
+    /** Guarda un código nuevo y borra los anteriores de ese correo. */
+    crear: async ({ correo, codigoHash, expiraEn }) => {
+      revisar(await db.from('codigos_acceso').delete().eq('correo', correo));
+      return aCodigo(revisar(await db.from('codigos_acceso').insert({ correo, codigo_hash: codigoHash, expira_en: expiraEn }).select('*').single()));
+    },
+    ultimo: async (correo) => aCodigo(revisar(await db.from('codigos_acceso').select('*').eq('correo', correo).order('id', { ascending: false }).limit(1).maybeSingle())),
+    actualizar: async (id, c) => {
+      const cambios = {};
+      if ('intentos' in c) cambios.intentos = c.intentos;
+      if ('usado' in c) cambios.usado = c.usado;
+      revisar(await db.from('codigos_acceso').update(cambios).eq('id', Number(id)));
+    },
+  };
+
+  return { tipo: 'supabase', perfiles, envios, usuarios, codigos };
 }
 
 module.exports = { crearAlmacenSupabase };

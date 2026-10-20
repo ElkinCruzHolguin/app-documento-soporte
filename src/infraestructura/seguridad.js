@@ -51,6 +51,19 @@ function crearFirmador(secreto) {
   };
 }
 
+/** Código numérico aleatorio (OTP), con ceros a la izquierda. */
+function generarCodigo(digitos = 6) {
+  return String(crypto.randomInt(0, 10 ** digitos)).padStart(digitos, '0');
+}
+
+/** Hash de un código de acceso (HMAC con APP_SECRETO): el código nunca se guarda en claro. */
+function crearHasherCodigos(secreto) {
+  const llave = secreto
+    ? crypto.createHash('sha256').update(`codigo|${secreto}`).digest()
+    : crypto.randomBytes(32);
+  return (correo, codigo) => crypto.createHmac('sha256', llave).update(`${correo}|${codigo}`).digest('base64url');
+}
+
 function leerCookie(req, nombre) {
   for (const parte of String(req.headers.cookie || '').split(';')) {
     const [k, ...v] = parte.trim().split('=');
@@ -79,4 +92,4 @@ function registrarFallo(clave) {
 }
 const limpiarFallos = (clave) => intentos.delete(clave);
 
-module.exports = { COOKIE, hashClave, verificarClave, igualSeguro, crearFirmador, leerCookie, cookieSesion, bloqueado, registrarFallo, limpiarFallos };
+module.exports = { COOKIE, hashClave, verificarClave, igualSeguro, crearFirmador, generarCodigo, crearHasherCodigos, leerCookie, cookieSesion, bloqueado, registrarFallo, limpiarFallos };

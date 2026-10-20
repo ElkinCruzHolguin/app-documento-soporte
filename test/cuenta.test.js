@@ -34,15 +34,15 @@ test('cambiar mi contraseña', async () => {
 
     const admin = (await login('jefe', 'clave-del-jefe-123')).cookie;
     const vitro = (await llamar('/api/perfiles', { cookie: admin, metodo: 'POST', cuerpo: { nombre: 'Vitro QA', config: {} } })).datos;
-    await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: 'vitro', clave: 'clave-vitro-123', perfilId: vitro.id } });
-    await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: 'atica', clave: 'clave-atica-123', perfilId: vitro.id } });
+    await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: 'vitro@ejemplo.com', clave: 'clave-vitro-123', perfilId: vitro.id } });
+    await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: 'atica@ejemplo.com', clave: 'clave-atica-123', perfilId: vitro.id } });
 
     // El administrador no la cambia aquí (es APP_CLAVE)
     const rAdmin = await cambiar(admin, 'clave-del-jefe-123', 'otra-clave-larga');
     assert.strictEqual(rAdmin.status, 400);
     assert.match(rAdmin.datos.error, /APP_CLAVE/);
 
-    const cVitro = (await login('vitro', 'clave-vitro-123')).cookie;
+    const cVitro = (await login('vitro@ejemplo.com', 'clave-vitro-123')).cookie;
     // Validaciones
     assert.match((await cambiar(cVitro, 'equivocada', 'nueva-clave-vitro')).datos.error, /actual no es correcta/);
     assert.match((await cambiar(cVitro, 'clave-vitro-123', 'corta')).datos.error, /10 caracteres/);
@@ -50,13 +50,13 @@ test('cambiar mi contraseña', async () => {
 
     // Cambio correcto: la anterior deja de servir y la nueva entra
     assert.strictEqual((await cambiar(cVitro, 'clave-vitro-123', 'nueva-clave-vitro')).status, 200);
-    assert.strictEqual((await login('vitro', 'clave-vitro-123')).status, 401);
-    assert.strictEqual((await login('vitro', 'nueva-clave-vitro')).status, 200);
+    assert.strictEqual((await login('vitro@ejemplo.com', 'clave-vitro-123')).status, 401);
+    assert.strictEqual((await login('vitro@ejemplo.com', 'nueva-clave-vitro')).status, 200);
     // Solo cambia la del usuario conectado
-    assert.strictEqual((await login('atica', 'clave-atica-123')).status, 200);
+    assert.strictEqual((await login('atica@ejemplo.com', 'clave-atica-123')).status, 200);
 
     // 5 intentos con la clave actual equivocada bloquean el cambio
-    const cAtica = (await login('atica', 'clave-atica-123')).cookie;
+    const cAtica = (await login('atica@ejemplo.com', 'clave-atica-123')).cookie;
     for (let i = 0; i < 5; i++) await cambiar(cAtica, 'mala', 'nueva-clave-atica');
     assert.strictEqual((await cambiar(cAtica, 'clave-atica-123', 'nueva-clave-atica')).status, 429);
   } finally {

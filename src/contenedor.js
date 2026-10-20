@@ -5,6 +5,7 @@ const { crearRepositorios } = require('./repositorios');
 const seguridad = require('./infraestructura/seguridad');
 const saphety = require('./infraestructura/saphety');
 const excel = require('./infraestructura/excel');
+const { crearEnviadorCorreo } = require('./infraestructura/correo');
 const { crearServicioAutenticacion } = require('./servicios/autenticacion.servicio');
 const { crearServicioCompanias } = require('./servicios/companias.servicio');
 const { crearServicioUsuarios } = require('./servicios/usuarios.servicio');
@@ -24,10 +25,12 @@ function crearContenedor(entorno) {
   const perfiles = perezoso('perfiles');
   const envios = perezoso('envios');
   const usuarios = perezoso('usuarios');
+  const codigos = perezoso('codigos');
+  const correo = crearEnviadorCorreo(entorno);
 
   const companias = crearServicioCompanias({ perfiles, saphety });
   const servicios = {
-    autenticacion: crearServicioAutenticacion({ entorno, usuarios, seguridad }),
+    autenticacion: crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguridad }),
     companias,
     usuarios: crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }),
     documentos: crearServicioDocumentos({ companias, perfiles, envios, saphety, excel }),

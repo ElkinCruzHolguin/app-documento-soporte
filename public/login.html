@@ -12,46 +12,117 @@
   .login h1 { font: 600 20px/1.25 var(--font-display); margin: 0 0 6px; display: flex; align-items: center; gap: 12px; }
   .login form > div { margin-top: 12px; }
   .login button { width: 100%; margin-top: 16px; padding: 9px; }
+  .login .alterno { margin-top: 16px; text-align: center; font-size: 13px; }
+  #codigo { font-size: 22px; letter-spacing: 8px; text-align: center; }
 </style>
 </head>
 <body>
 <main>
   <section class="panel login">
     <h1>Documentos soporte · Saphety</h1>
-    <p class="ayuda">Ingresa con el usuario y la contraseña de tu compañía.</p>
+    <p class="ayuda" id="ayuda">Ingresa con el usuario y la contraseña de tu compañía.</p>
     <div id="msg"></div>
+
+    <!-- Código al correo (OTP): paso 1, el correo; paso 2, el código -->
+    <form id="formCorreo" hidden>
+      <div><label for="correo">Correo</label><input id="correo" name="correo" type="email" autocomplete="email" required></div>
+      <button type="submit" id="btnCorreo">Enviarme un código</button>
+    </form>
+    <form id="formCodigo" hidden>
+      <div><label for="codigo">Código de 6 dígitos</label><input id="codigo" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required></div>
+      <button type="submit" id="btnCodigo">Ingresar</button>
+      <p class="alterno"><a href="#" id="btnReenviar">Reenviar código</a> · <a href="#" id="btnOtroCorreo">Usar otro correo</a></p>
+    </form>
+
+    <!-- Usuario y contraseña (respaldo) -->
     <form id="form">
       <div><label for="usuario">Usuario</label><input id="usuario" name="usuario" autocomplete="username" required autofocus></div>
       <div><label for="clave">Contraseña</label><input id="clave" name="clave" type="password" autocomplete="current-password" required></div>
       <button type="submit" id="btn">Ingresar</button>
     </form>
+
+    <p class="alterno" id="cambiarModo" hidden><a href="#" id="btnModo"></a></p>
   </section>
 </main>
 <script>
-const form = document.getElementById('form');
-form.onsubmit = async (ev) => {
+const $ = (id) => document.getElementById(id);
+const form = $('form');
+const formCorreo = $('formCorreo');
+const formCodigo = $('formCodigo');
+const msg = $('msg');
+const aviso = (texto, tipo) => { msg.innerHTML = texto ? `<div class="aviso ${tipo}"></div>` : ''; if (texto) msg.firstChild.textContent = texto; };
+
+async function post(ruta, cuerpo) {
+  const r = await fetch(ruta, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+  return d;
+}
+async function ocupado(boton, fn) {
+  boton.disabled = true;
+  aviso('');
+  try { await fn(); } catch (e) { aviso(e.message, 'err'); } finally { boton.disabled = false; }
+}
+
+// Modos: 'codigo' (correo + código) o 'clave' (usuario + contraseña).
+let modo = 'clave';
+let hayCodigo = false;
+function mostrar(nuevo, paso = 'correo') {
+  modo = nuevo;
+  aviso('');
+  form.hidden = modo !== 'clave';
+  formCorreo.hidden = modo !== 'codigo' || paso !== 'correo';
+  formCodigo.hidden = modo !== 'codigo' || paso !== 'codigo';
+  $('ayuda').textContent = modo === 'clave'
+    ? 'Ingresa con el usuario y la contraseña de tu compañía.'
+    : paso === 'correo' ? 'Escribe tu correo y te enviaremos un código de acceso de un solo uso.' : `Escribe el código que enviamos a ${formCorreo.correo.value.trim()}. Vence en 10 minutos.`;
+  $('cambiarModo').hidden = !hayCodigo;
+  $('btnModo').textContent = modo === 'clave' ? 'Entrar con un código al correo' : 'Entrar con usuario y contraseña';
+  (modo === 'clave' ? form.usuario : paso === 'correo' ? formCorreo.correo : formCodigo.codigo).focus();
+}
+$('btnModo').onclick = (ev) => { ev.preventDefault(); mostrar(modo === 'clave' ? 'codigo' : 'clave'); };
+
+async function pedirCodigo() {
+  const d = await post('/api/login/codigo', { correo: formCorreo.correo.value });
+  mostrar('codigo', 'codigo');
+  aviso(d.mensaje, 'ok');
+}
+formCorreo.onsubmit = (ev) => { ev.preventDefault(); ocupado($('btnCorreo'), pedirCodigo); };
+$('btnReenviar').onclick = (ev) => { ev.preventDefault(); formCodigo.codigo.value = ''; ocupado($('btnCodigo'), pedirCodigo); };
+$('btnOtroCorreo').onclick = (ev) => { ev.preventDefault(); formCodigo.codigo.value = ''; mostrar('codigo', 'correo'); };
+formCodigo.onsubmit = (ev) => {
   ev.preventDefault();
-  const btn = document.getElementById('btn');
-  const msg = document.getElementById('msg');
-  btn.disabled = true;
-  msg.innerHTML = '';
-  try {
-    const r = await fetch('/api/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usuario: form.usuario.value, clave: form.clave.value }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
-    location.href = 'index.html';
-  } catch (e) {
-    msg.innerHTML = `<div class="aviso err"></div>`;
-    msg.firstChild.textContent = e.message;
-    form.clave.value = '';
-    form.clave.focus();
-  } finally {
-    btn.disabled = false;
-  }
+  ocupado($('btnCodigo'), async () => {
+    try {
+      await post('/api/login/verificar', { correo: formCorreo.correo.value, codigo: formCodigo.codigo.value });
+      location.href = 'index.html';
+    } catch (e) {
+      formCodigo.codigo.value = '';
+      formCodigo.codigo.focus();
+      throw e;
+    }
+  });
 };
+
+form.onsubmit = (ev) => {
+  ev.preventDefault();
+  ocupado($('btn'), async () => {
+    try {
+      await post('/api/login', { usuario: form.usuario.value, clave: form.clave.value });
+      location.href = 'index.html';
+    } catch (e) {
+      form.clave.value = '';
+      form.clave.focus();
+      throw e;
+    }
+  });
+};
+
+// Si el servidor tiene configurado el envío de correos, se entra por defecto con código.
+fetch('/api/login/opciones').then((r) => (r.ok ? r.json() : {})).then((o) => {
+  hayCodigo = !!o.codigo;
+  if (hayCodigo) mostrar('codigo');
+}).catch(() => {});
 </script>
 </body>
 </html>

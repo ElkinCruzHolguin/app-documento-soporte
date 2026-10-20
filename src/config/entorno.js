@@ -14,6 +14,12 @@ function leerEntorno(env = process.env) {
     autenticacion,
     secreto: env.APP_SECRETO || '',
     enVercel: !!env.VERCEL,
+    // Ingreso con código de un solo uso (OTP) enviado al correo.
+    correoAdmin: String(env.APP_CORREO || '').trim().toLowerCase(), // correo del super administrador (opcional)
+    correo: {
+      llaveResend: env.RESEND_API_KEY || '',
+      remitente: env.CORREO_REMITENTE || '',
+    },
   };
 }
 
