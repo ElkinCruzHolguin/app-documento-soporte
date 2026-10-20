@@ -6,7 +6,8 @@ function crearControladorSesion({ autenticacion, companias, modulos }, { cookieS
   return {
     async iniciar(req, res) {
       const { usuario, clave } = req.body || {};
-      const r = await autenticacion.iniciarSesion({ usuario, clave, ip: req.ip });
+      const equipo = seguridad.leerCookie(req, seguridad.COOKIE_CONFIANZA);
+      const r = await autenticacion.iniciarSesion({ usuario, clave, ip: req.ip, equipo });
       if (r.pendiente) {
         // Contraseña correcta: falta el código que se envió al correo.
         res.set('Set-Cookie', seguridad.cookiePendiente(r.pendiente, { segura: cookieSegura }));
@@ -18,10 +19,12 @@ function crearControladorSesion({ autenticacion, companias, modulos }, { cookieS
 
     async verificarCodigo(req, res) {
       const pendiente = seguridad.leerCookie(req, seguridad.COOKIE_PENDIENTE);
-      const { token, rol } = await autenticacion.verificarCodigo({ pendiente, codigo: (req.body || {}).codigo, ip: req.ip });
+      const { codigo, recordar } = req.body || {};
+      const { token, rol, equipo } = await autenticacion.verificarCodigo({ pendiente, codigo, ip: req.ip, recordar: !!recordar });
       res.set('Set-Cookie', [
         seguridad.cookieSesion(token, { segura: cookieSegura }),
         seguridad.cookiePendiente('', { segura: cookieSegura }),
+        ...(equipo ? [seguridad.cookieConfianza(equipo, { segura: cookieSegura })] : []),
       ]);
       res.json({ ok: true, rol });
     },

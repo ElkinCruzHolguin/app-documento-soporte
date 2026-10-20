@@ -6,6 +6,8 @@
 // deja un estado «pendiente» (cookie firmada aparte, 10 minutos), envía un código de un solo uso (OTP)
 // al correo de la cuenta, y solo al validar el código emite la cookie de sesión.
 // Sin envío de correos configurado (o una cuenta sin correo) se entra solo con contraseña, como antes.
+// Al validar el código se puede recordar el navegador 30 días: ahí se entra solo con contraseña. Cambiar la
+// contraseña o el correo de la cuenta invalida los navegadores recordados.
 const crypto = require('node:crypto');
 const { fallo } = require('../dominio/errores');
 const { esCorreo, OTP, mensajeCodigo, enmascararCorreo } = require('../dominio/correo');
@@ -17,6 +19,7 @@ const PENDIENTE_VENCIDO = 'Tu ingreso venció. Vuelve a escribir tu usuario y co
 function crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguridad }) {
   const firmador = seguridad.crearFirmador(entorno.secreto);
   const firmadorPendiente = seguridad.crearFirmador(entorno.secreto, { proposito: 'pendiente-2fa', duracionMs: seguridad.DURACION_PENDIENTE_MS });
+  const firmadorEquipo = seguridad.crearFirmador(entorno.secreto, { proposito: 'equipo-confiable', duracionMs: seguridad.DURACION_CONFIANZA_MS });
   const hashCodigo = seguridad.crearHasherCodigos(entorno.secreto);
   const HASH_FALSO = seguridad.hashClave(crypto.randomBytes(16).toString('hex')); // iguala el tiempo si el usuario no existe
   const USUARIO_LOCAL = { id: 0, usuario: 'local', rol: 'admin', perfilId: null };
@@ -27,6 +30,19 @@ function crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguri
 
   /** Correo al que se envía el código de esa cuenta, o '' si no tiene. */
   const destinoDe = (datos) => (datos.rol === 'admin' && !datos.id ? entorno.correoAdmin : esCorreo(datos.usuario) ? datos.usuario : '');
+
+  /** Huella de la contraseña y el correo de la cuenta: si cambian, el navegador recordado deja de valer. */
+  async function huellaDe(datos, destino) {
+    let base = entorno.claveAdmin;
+    if (datos.id) base = ((await usuarios.porNombre(datos.usuario)) || {}).claveHash || crypto.randomBytes(8).toString('hex');
+    return crypto.createHash('sha256').update(`${base}|${destino}`).digest('base64url').slice(0, 22);
+  }
+
+  /** ¿Este navegador ya validó un código de esta cuenta (y sigue con la misma contraseña y correo)? */
+  async function equipoConfiable(token, datos, destino) {
+    const t = token && firmadorEquipo.leer(token);
+    return !!t && t.id === datos.id && t.usuario === datos.usuario && seguridad.igualSeguro(t.huella, await huellaDe(datos, destino));
+  }
 
   async function enviarCodigo(pendiente) {
     const codigo = seguridad.generarCodigo(OTP.digitos);
@@ -71,7 +87,7 @@ function crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguri
      * Paso 1: usuario y contraseña. 5 intentos fallidos por IP y usuario bloquean 15 minutos.
      * Devuelve { token, rol } si la cuenta entra solo con contraseña, o { pendiente, destino } si falta el código.
      */
-    async iniciarSesion({ usuario, clave, ip }) {
+    async iniciarSesion({ usuario, clave, ip, equipo }) {
       const nombre = String(usuario || '').trim().toLowerCase();
       const contrasena = String(clave || '');
       if (!entorno.autenticacion) return { token: '', rol: 'admin' };
@@ -93,15 +109,18 @@ function crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguri
       seguridad.limpiarFallos(llave);
 
       const destino = dosPasos() ? destinoDe(datos) : '';
-      if (!destino) return emitirSesion(datos);
+      if (!destino || (await equipoConfiable(equipo, datos, destino))) return emitirSesion(datos);
       const pendiente = { ...datos, destino };
       limitarEnvios(ip, pendiente);
       await enviarCodigo(pendiente);
       return { pendiente: firmadorPendiente.emitir(pendiente), destino: enmascararCorreo(destino) };
     },
 
-    /** Paso 2: valida el código del correo y emite la sesión. Cada código sirve una vez, vence en 10 minutos y admite 5 intentos. */
-    async verificarCodigo({ pendiente: token, codigo, ip }) {
+    /**
+     * Paso 2: valida el código del correo y emite la sesión. Cada código sirve una vez, vence en 10 minutos y admite 5 intentos.
+     * Con recordar, devuelve también el token del navegador de confianza (30 días).
+     */
+    async verificarCodigo({ pendiente: token, codigo, ip, recordar }) {
       const p = leerPendiente(token);
       const llave = llaveCodigo(p);
       const llaveIntentos = `otp|${ip}|${llave}`;
@@ -119,7 +138,9 @@ function crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguri
       seguridad.limpiarFallos(llaveIntentos);
       const { destino, exp, ...datos } = p; // eslint-disable-line no-unused-vars
       if (!(await sigueValida(datos))) throw fallo(401, PENDIENTE_VENCIDO);
-      return emitirSesion(datos);
+      const sesion = await emitirSesion(datos);
+      if (!recordar) return sesion;
+      return { ...sesion, equipo: firmadorEquipo.emitir({ id: datos.id, usuario: datos.usuario, huella: await huellaDe(datos, destino) }) };
     },
 
     /** Envía un código nuevo a la cuenta que está en el paso 2. */

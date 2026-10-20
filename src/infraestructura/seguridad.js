@@ -8,6 +8,9 @@ const COOKIE = 'ds_sesion';
 // Segundo paso del inicio de sesión: contraseña correcta, falta el código del correo.
 const COOKIE_PENDIENTE = 'ds_2fa';
 const DURACION_PENDIENTE_MS = 10 * 60 * 1000;
+// Navegador de confianza: tras validar el código, durante 30 días ese navegador entra solo con contraseña.
+const COOKIE_CONFIANZA = 'ds_equipo';
+const DURACION_CONFIANZA_MS = 30 * 24 * 60 * 60 * 1000;
 
 function hashClave(clave) {
   const sal = crypto.randomBytes(16);
@@ -83,6 +86,7 @@ function crearCookie(nombre, token, duracionMs, { segura }) {
 }
 const cookieSesion = (token, opciones) => crearCookie(COOKIE, token, DURACION_MS, opciones);
 const cookiePendiente = (token, opciones) => crearCookie(COOKIE_PENDIENTE, token, DURACION_PENDIENTE_MS, opciones);
+const cookieConfianza = (token, opciones) => crearCookie(COOKIE_CONFIANZA, token, DURACION_CONFIANZA_MS, opciones);
 
 // Frena ataques de fuerza bruta: 5 intentos fallidos por IP y usuario cada 15 minutos.
 const intentos = new Map();
@@ -98,4 +102,4 @@ function registrarFallo(clave) {
 }
 const limpiarFallos = (clave) => intentos.delete(clave);
 
-module.exports = { COOKIE, COOKIE_PENDIENTE, DURACION_PENDIENTE_MS, cookiePendiente, hashClave, verificarClave, igualSeguro, crearFirmador, generarCodigo, crearHasherCodigos, leerCookie, cookieSesion, bloqueado, registrarFallo, limpiarFallos };
+module.exports = { COOKIE, COOKIE_PENDIENTE, DURACION_PENDIENTE_MS, cookiePendiente, COOKIE_CONFIANZA, DURACION_CONFIANZA_MS, cookieConfianza, hashClave, verificarClave, igualSeguro, crearFirmador, generarCodigo, crearHasherCodigos, leerCookie, cookieSesion, bloqueado, registrarFallo, limpiarFallos };
