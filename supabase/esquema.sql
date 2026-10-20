@@ -52,6 +52,9 @@ create table if not exists public.usuarios (
   check (rol = 'admin' or perfil_id is not null)
 );
 create index if not exists envios_perfil on public.envios (perfil_id, id desc);
+-- Módulos que ve el usuario (lista de claves, ver src/dominio/modulos.js). null = todos los de su compañía.
+-- Los de la compañía van en perfiles.config.modulos.
+alter table public.usuarios add column if not exists modulos jsonb;
 
 -- Códigos de acceso de un solo uso (OTP) enviados al correo. Solo se guarda el hash (HMAC con APP_SECRETO).
 -- Pedir un código nuevo borra los anteriores de ese correo.

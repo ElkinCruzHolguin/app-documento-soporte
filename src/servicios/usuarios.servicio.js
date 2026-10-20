@@ -4,6 +4,7 @@
 // El usuario es el correo: entra con él y su contraseña, y ahí recibe el código del segundo paso.
 const { fallo } = require('../dominio/errores');
 const { esCorreo, normalizarCorreo } = require('../dominio/correo');
+const { limpiarModulos } = require('../dominio/modulos');
 
 const ROLES = ['empresa'];
 
@@ -34,13 +35,14 @@ function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
       return usuarios.listar();
     },
 
-    async crear(actor, { usuario, clave, rol = 'empresa', perfilId }) {
+    /** modulos: lista de módulos que ve el usuario; null = todos los de su compañía. */
+    async crear(actor, { usuario, clave, rol = 'empresa', perfilId, modulos = null }) {
       exigirAdmin(actor);
       const nombre = normalizarCorreo(usuario);
       validarCorreo(nombre);
       validarClave(clave);
       await validarRolYCompania(rol, Number(perfilId));
-      return usuarios.crear({ usuario: nombre, claveHash: seguridad.hashClave(clave), rol, perfilId: Number(perfilId) });
+      return usuarios.crear({ usuario: nombre, claveHash: seguridad.hashClave(clave), rol, perfilId: Number(perfilId), modulos: limpiarModulos(modulos, fallo) });
     },
 
     async actualizar(actor, id, datos) {
@@ -57,6 +59,7 @@ function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
         cambios.claveHash = seguridad.hashClave(datos.clave);
       }
       if ('activo' in datos) cambios.activo = !!datos.activo;
+      if ('modulos' in datos) cambios.modulos = limpiarModulos(datos.modulos, fallo);
       if ('rol' in datos || 'perfilId' in datos) {
         const rol = datos.rol || actual.rol;
         const perfilId = Number(datos.perfilId ?? actual.perfilId);

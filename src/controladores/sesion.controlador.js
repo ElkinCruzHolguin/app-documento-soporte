@@ -2,7 +2,7 @@
 // Inicio de sesión (contraseña y luego código al correo), cierre y estado del usuario conectado.
 const seguridad = require('../infraestructura/seguridad');
 
-function crearControladorSesion({ autenticacion, companias }, { cookieSegura }) {
+function crearControladorSesion({ autenticacion, companias, modulos }, { cookieSegura }) {
   return {
     async iniciar(req, res) {
       const { usuario, clave } = req.body || {};
@@ -35,10 +35,15 @@ function crearControladorSesion({ autenticacion, companias }, { cookieSegura }) 
       res.set('Set-Cookie', seguridad.cookieSesion('', { segura: cookieSegura })).json({ ok: true });
     },
 
+    /** Catálogo de módulos (para Administración). */
+    modulos(req, res) {
+      res.json(modulos.catalogo());
+    },
+
     async estado(req, res) {
-      const p = await companias.deActor(req.usuario);
+      const [p, mods] = await Promise.all([companias.deActor(req.usuario), modulos.deActor(req.usuario)]);
       res.json({
-        usuario: { usuario: req.usuario.usuario, rol: req.usuario.rol, login: autenticacion.activa },
+        usuario: { usuario: req.usuario.usuario, rol: req.usuario.rol, login: autenticacion.activa, modulos: mods },
         perfil: p && { id: p.id, nombre: p.nombre, modoEnvio: p.config.modoEnvio, url: p.config.url, numeracion: p.config.numeracion },
       });
     },

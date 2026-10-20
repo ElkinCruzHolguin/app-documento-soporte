@@ -114,10 +114,10 @@ function crearAlmacenArchivo(dir) {
     obtener: async (id) => usuarioPublico(leerUsuarios().find((u) => u.id === Number(id))),
     /** Incluye claveHash: solo para el inicio de sesión. */
     porNombre: async (usuario) => leerUsuarios().find((u) => u.usuario === usuario) || null,
-    crear: async ({ usuario, claveHash, rol, perfilId }) => {
+    crear: async ({ usuario, claveHash, rol, perfilId, modulos = null }) => {
       const lista = leerUsuarios();
       if (lista.some((u) => u.usuario === usuario)) throw fallo(400, 'Ya existe un usuario con ese nombre.');
-      const u = { id: lista.reduce((m, x) => Math.max(m, x.id), 0) + 1, usuario, claveHash, rol, perfilId: perfilId ?? null, activo: true, creadoEn: new Date().toISOString() };
+      const u = { id: lista.reduce((m, x) => Math.max(m, x.id), 0) + 1, usuario, claveHash, rol, perfilId: perfilId ?? null, modulos, activo: true, creadoEn: new Date().toISOString() };
       lista.push(u);
       guardarJson(ARCHIVO_USUARIOS, lista);
       return usuarioPublico(u);

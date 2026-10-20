@@ -2,6 +2,7 @@
 // Compañías (en la base de datos, "perfiles"): conexión con Saphety, parámetros y datos de cada una.
 // Solo el administrador las crea y modifica; un usuario de compañía consulta la suya en solo lectura.
 const { fallo } = require('../dominio/errores');
+const { limpiarModulos } = require('../dominio/modulos');
 
 const esAdmin = (actor) => actor.rol === 'admin';
 const CAMPOS_NUMERICOS = ['siguienteConsecutivo'];
@@ -18,6 +19,8 @@ function limpiarConfig(entrada) {
     if (typeof c[k] !== 'string') continue;
     try { c[k] = JSON.parse(c[k]); } catch { throw fallo(400, `La tabla de ${nombre} no es un JSON válido.`); }
   }
+  // Módulos habilitados para la compañía (sus usuarios no pueden ver otros).
+  if ('modulos' in c) c.modulos = limpiarModulos(c.modulos, fallo) ?? undefined;
   return c;
 }
 

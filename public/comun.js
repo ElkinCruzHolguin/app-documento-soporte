@@ -2,20 +2,36 @@
 
 // Menú lateral: una sola lista para todas las páginas. Para agregar una página nueva basta con sumarla aquí
 // y poner <nav id="menu" data-activo="mi-pagina.html"></nav> en su HTML.
+// `modulo` es el módulo que habilita la página (ver src/dominio/modulos.js).
 const MENU = [
-  { href: 'dashboard.html', texto: 'Dashboard' },
-  { href: 'index.html', texto: 'Cargar y enviar' },
-  { href: 'emitidos.html', texto: 'Emitidos' },
-  { href: 'recibidos.html', texto: 'Recibidos' },
-  { href: 'historial.html', texto: 'Historial' },
-  { href: 'admin.html', texto: 'Administración', admin: true },
+  { href: 'dashboard.html', texto: 'Dashboard', modulo: 'dashboard' },
+  { href: 'index.html', texto: 'Cargar y enviar', modulo: 'cargar' },
+  { href: 'emitidos.html', texto: 'Emitidos', modulo: 'emitidos' },
+  { href: 'recibidos.html', texto: 'Recibidos', modulo: 'recibidos' },
+  { href: 'historial.html', texto: 'Historial', modulo: 'historial' },
+  { href: 'admin.html', texto: 'Administración', admin: true, modulo: 'compania' },
 ];
+// Páginas de detalle que no están en el menú.
+const MODULO_DE_PAGINA = { 'documento.html': 'emitidos', 'recibido.html': 'recibidos' };
+const paginaActual = () => location.pathname.split('/').pop() || 'index.html';
+const moduloDePagina = (pagina) => (MENU.find((m) => m.href === pagina) || {}).modulo || MODULO_DE_PAGINA[pagina];
+
+/** Oculta del menú lo que el usuario no tiene y lo saca de una página que no puede ver. */
+function aplicarModulos(modulos) {
+  if (!Array.isArray(modulos)) return;
+  document.querySelectorAll('#menu a[data-modulo]').forEach((a) => { a.hidden = !modulos.includes(a.dataset.modulo); });
+  const modulo = moduloDePagina(paginaActual());
+  if (modulo && !modulos.includes(modulo)) {
+    const destino = MENU.find((m) => modulos.includes(m.modulo));
+    location.replace(destino ? destino.href : 'cuenta.html');
+  }
+}
 
 function pintarMenu() {
   const nav = document.getElementById('menu');
   if (!nav) return;
-  const activo = nav.dataset.activo || location.pathname.split('/').pop() || 'index.html';
-  nav.innerHTML = MENU.map((m) => `<a href="${m.href}"${m.href === activo ? ' class="activo"' : ''}${m.admin ? ' data-enlace-admin' : ''}>${m.texto}</a>`).join('');
+  const activo = nav.dataset.activo || paginaActual();
+  nav.innerHTML = MENU.map((m) => `<a href="${m.href}" data-modulo="${m.modulo}"${m.href === activo ? ' class="activo"' : ''}${m.admin ? ' data-enlace-admin' : ''}>${m.texto}</a>`).join('');
 }
 document.addEventListener('DOMContentLoaded', pintarMenu);
 async function api(ruta, opciones = {}) {
@@ -53,6 +69,7 @@ async function pintarBanner() {
   try {
     const { perfil, usuario } = await api('/api/estado');
     const esAdmin = usuario.rol === 'admin';
+    aplicarModulos(usuario.modulos);
     // Un usuario de compañía ve la configuración de la suya en solo lectura (el servidor impide modificarla).
     if (!esAdmin) document.querySelectorAll('[data-enlace-admin]').forEach((a) => { a.textContent = 'Mi compañía'; });
     const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>'

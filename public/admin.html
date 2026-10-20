@@ -28,6 +28,12 @@
 
   <form id="form">
     <section class="panel">
+      <h2>Módulos habilitados</h2>
+      <p class="ayuda">Lo que pueden usar los usuarios de esta compañía. A cada usuario le puedes dejar todos estos o solo algunos (sección Usuarios, abajo). Tú, como administrador, siempre ves todo.</p>
+      <div class="modulos" id="modulosCompania"></div>
+    </section>
+
+    <section class="panel">
       <h2>Conexión con Saphety</h2>
       <div class="rejilla">
         <div><label>Nombre de la compañía</label><input name="nombre" required></div>
@@ -114,7 +120,7 @@
     <div id="msgUsuarios"></div>
     <div class="tabla-scroll">
       <table>
-        <thead><tr><th>Usuario</th><th>Rol</th><th>Compañía</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead>
+        <thead><tr><th>Usuario</th><th>Rol</th><th>Compañía</th><th>Módulos</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead>
         <tbody id="filasUsuarios"></tbody>
       </table>
     </div>
@@ -126,12 +132,21 @@
         <div class="ayuda"><a href="#" id="btnGenerar">Generar una segura</a> · cópiala y entrégala a la compañía: después no se puede ver.</div></div>
       <div id="cajaPerfil"><label for="nuPerfil">Compañía</label><select id="nuPerfil"></select></div>
     </div>
+    <label style="margin-top:12px">Módulos que verá</label>
+    <div class="modulos" id="nuModulos"></div>
+    <div class="ayuda">Solo aparecen los módulos habilitados en la compañía elegida.</div>
     <div class="fila-botones"><button type="button" id="btnCrearUsuario">Crear usuario</button></div>
   </section>
 </main>
 <script>
 let perfiles = [];
 let actual = null;
+let catalogoModulos = [];
+const nombreModulo = (c) => (catalogoModulos.find((m) => m.clave === c) || {}).nombre || c;
+// Módulos habilitados de una compañía (sin configurar = todos).
+const modulosDe = (p) => (p && Array.isArray(p.config.modulos) ? catalogoModulos.map((m) => m.clave).filter((c) => p.config.modulos.includes(c)) : catalogoModulos.map((m) => m.clave));
+const casillas = (claves, marcadas, nombre) => claves.map((c) => `<label><input type="checkbox" name="${nombre}" value="${c}" ${marcadas.includes(c) ? 'checked' : ''}> ${esc(nombreModulo(c))}</label>`).join('');
+const marcadasEn = (contenedor) => [...contenedor.querySelectorAll('input[type=checkbox]:checked')].map((x) => x.value);
 const form = document.getElementById('form');
 const msg = (html, tipo = 'ok') => {
   document.getElementById('msg').innerHTML = html ? `<div class="aviso ${tipo}">${html}</div>` : '';
@@ -150,8 +165,9 @@ async function cargar(idSeleccion) {
 function mostrar(p) {
   actual = p;
   form.nombre.value = p.nombre;
+  document.getElementById('modulosCompania').innerHTML = casillas(catalogoModulos.map((m) => m.clave), modulosDe(p), 'modulos');
   for (const [k, v] of Object.entries(p.config)) {
-    if (!form.elements[k]) continue;
+    if (!form.elements[k] || k === 'modulos') continue;
     form.elements[k].value = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
   }
   form.clave.value = '';
@@ -164,9 +180,10 @@ function mostrar(p) {
 function leerFormulario() {
   const config = {};
   for (const el of form.elements) {
-    if (!el.name || ['nombre', 'clave'].includes(el.name)) continue;
+    if (!el.name || ['nombre', 'clave', 'modulos'].includes(el.name)) continue;
     config[el.name] = el.value;
   }
+  config.modulos = marcadasEn(document.getElementById('modulosCompania'));
   return { nombre: form.nombre.value, clave: form.clave.value || undefined, config };
 }
 
@@ -186,7 +203,7 @@ document.getElementById('btnNuevo').onclick = async () => {
   if (!nombre) return;
   try {
     const p = await api('/api/perfiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre, config: {} }) });
-    msg('Compañía creada. Completa su conexión y parámetros y pulsa Guardar. Luego crea sus usuarios en la sección Usuarios.');
+    msg('Compañía creada. Marca los módulos que tendrá, completa su conexión y parámetros y pulsa Guardar. Luego crea sus usuarios en la sección Usuarios.');
     await cargar(p.id);
   } catch (e) { msg(esc(e.message), 'err'); }
 };
@@ -237,19 +254,36 @@ function claveAleatoria() {
 async function cargarUsuarios() {
   try {
     const lista = await api('/api/usuarios');
-    document.getElementById('nuPerfil').innerHTML = opcionesPerfil();
+    const nuPerfil = document.getElementById('nuPerfil');
+    const elegido = nuPerfil.value;
+    nuPerfil.innerHTML = opcionesPerfil();
+    if (elegido) nuPerfil.value = elegido;
+    pintarModulosNuevo();
+    const resumenModulos = (u) => {
+      const deCompania = modulosDe(perfiles.find((p) => p.id === u.perfilId));
+      const ve = Array.isArray(u.modulos) ? deCompania.filter((c) => u.modulos.includes(c)) : deCompania;
+      if (!Array.isArray(u.modulos)) return 'Todos los de la compañía';
+      return ve.length ? ve.map(nombreModulo).join(', ') : 'Ninguno';
+    };
     document.getElementById('filasUsuarios').innerHTML = lista.length ? lista.map((u) => `<tr data-id="${u.id}">
       <td><b>${esc(u.usuario)}</b></td>
       <td>${u.rol === 'admin' ? 'Administrador' : 'Compañía'}</td>
       <td>${u.rol === 'admin' ? '— (todos)' : `<select class="selPerfilU" style="max-width:220px">${opcionesPerfil(u.perfilId)}</select>`}</td>
+      <td style="max-width:220px">${esc(resumenModulos(u))}</td>
       <td>${u.activo ? '<span class="chip aceptado">Activo</span>' : '<span class="chip con_errores">Desactivado</span>'}</td>
       <td>${esc(fechaHora(u.ultimoIngreso))}</td>
       <td style="white-space:nowrap">
+        <button class="secundario btnModulos">Módulos</button>
         <button class="secundario btnCorreo">Cambiar correo</button>
         <button class="secundario btnClave">Cambiar contraseña</button>
         <button class="secundario btnActivo">${u.activo ? 'Desactivar' : 'Activar'}</button>
         <button class="peligro btnBorrar">Eliminar</button>
-      </td></tr>`).join('') : '<tr><td colspan="6" class="ayuda">Aún no hay usuarios.</td></tr>';
+      </td></tr>
+      <tr class="editorModulos" data-para="${u.id}" hidden><td colspan="7">
+        <label><input type="checkbox" class="todos" ${Array.isArray(u.modulos) ? '' : 'checked'} style="width:auto"> Todos los de la compañía (incluye los que se le habiliten después)</label>
+        <div class="modulos">${casillas(modulosDe(perfiles.find((p) => p.id === u.perfilId)), Array.isArray(u.modulos) ? u.modulos : modulosDe(perfiles.find((p) => p.id === u.perfilId)), 'moduloU')}</div>
+        <div class="fila-botones"><button class="btnGuardarModulos">Guardar módulos</button></div>
+      </td></tr>`).join('') : '<tr><td colspan="7" class="ayuda">Aún no hay usuarios.</td></tr>';
     for (const tr of document.querySelectorAll('#filasUsuarios tr[data-id]')) {
       const u = lista.find((x) => x.id === Number(tr.dataset.id));
       const accion = async (fn, ok) => { try { await fn(); msgU(ok); await cargarUsuarios(); } catch (e) { msgU(esc(e.message), 'err'); } };
@@ -258,6 +292,16 @@ async function cargarUsuarios() {
         const clave = prompt(`Nueva contraseña para «${u.usuario}» (mínimo 10 caracteres):`, claveAleatoria());
         if (clave) accion(() => put({ clave }), `Contraseña de «${esc(u.usuario)}» actualizada. Entrégasela: <b>${esc(clave)}</b>`);
       };
+      const editor = document.querySelector(`tr.editorModulos[data-para="${u.id}"]`);
+      const todos = editor.querySelector('.todos');
+      const sincronizar = () => editor.querySelectorAll('.modulos input').forEach((x) => { x.disabled = todos.checked; });
+      todos.onchange = sincronizar;
+      sincronizar();
+      tr.querySelector('.btnModulos').onclick = () => { editor.hidden = !editor.hidden; };
+      editor.querySelector('.btnGuardarModulos').onclick = () => accion(
+        () => put({ modulos: todos.checked ? null : marcadasEn(editor.querySelector('.modulos')) }),
+        `Módulos de «${esc(u.usuario)}» actualizados.`,
+      );
       tr.querySelector('.btnCorreo').onclick = () => {
         const usuario = prompt(`Nuevo correo para «${u.usuario}». Será su usuario para entrar:`, u.usuario.includes('@') ? u.usuario : '');
         if (usuario) accion(() => put({ usuario }), `«${esc(u.usuario)}» ahora entra con el correo <b>${esc(usuario.trim().toLowerCase())}</b>.`);
@@ -272,12 +316,24 @@ async function cargarUsuarios() {
   } catch (e) { msgU(esc(e.message), 'err'); }
 }
 
+// Casillas del usuario nuevo: los módulos de la compañía elegida, todos marcados.
+function pintarModulosNuevo() {
+  const p = perfiles.find((x) => x.id === Number(document.getElementById('nuPerfil').value));
+  const claves = modulosDe(p);
+  document.getElementById('nuModulos').innerHTML = casillas(claves, claves, 'nuModulo');
+}
+document.getElementById('nuPerfil').onchange = pintarModulosNuevo;
+
 document.getElementById('btnGenerar').onclick = (ev) => { ev.preventDefault(); document.getElementById('nuClave').value = claveAleatoria(); };
 document.getElementById('btnCrearUsuario').onclick = async () => {
   const cuerpo = {
     usuario: document.getElementById('nuUsuario').value, clave: document.getElementById('nuClave').value,
     rol: 'empresa', perfilId: Number(document.getElementById('nuPerfil').value),
   };
+  const deCompania = modulosDe(perfiles.find((p) => p.id === cuerpo.perfilId));
+  const marcados = marcadasEn(document.getElementById('nuModulos'));
+  // Todos marcados = sin restricción (verá también lo que se le habilite después a la compañía).
+  cuerpo.modulos = marcados.length === deCompania.length ? null : marcados;
   try {
     const u = await api('/api/usuarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
     msgU(`Usuario «${esc(u.usuario)}» creado. Entrégale estos datos: usuario <b>${esc(u.usuario)}</b>, contraseña <b>${esc(cuerpo.clave)}</b>. Al entrar recibirá un código en ese correo. La contraseña no se volverá a mostrar.`);
@@ -295,7 +351,8 @@ function soloLectura() {
   document.querySelector('.panel .ayuda').textContent = 'Configuración de tu compañía (solo lectura). Si algo debe cambiar, pídeselo al administrador.';
 }
 
-api('/api/estado').then(({ usuario }) => {
+Promise.all([api('/api/modulos'), api('/api/estado')]).then(([modulos, { usuario }]) => {
+  catalogoModulos = modulos;
   if (usuario.rol === 'admin') return cargar().then(cargarUsuarios);
   return cargar().then(soloLectura);
 });
