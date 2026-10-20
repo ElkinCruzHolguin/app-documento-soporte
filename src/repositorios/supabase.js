@@ -78,13 +78,13 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
       nit_adquiriente: r.nitAdquiriente, proveedor: r.proveedor, identificacion: r.identificacion, valor: r.valor,
       saphety_id: r.saphetyId, cuds: r.cuds, mensaje: r.mensaje, documento: r.documento, respuesta: r.respuesta,
     }).select('id').single()).id,
-    previos: async (nit, numerosExcel) => {
+    previos: async (perfilId, numerosExcel) => {
       const filas = new Map(); // id -> fila (una fila puede salir por numero_excel y por numero)
       for (let i = 0; i < numerosExcel.length; i += 200) {
         const lote = numerosExcel.slice(i, i + 200);
         for (const columna of ['numero_excel', 'numero']) {
           const r = revisar(await db.from('envios').select('id, numero, numero_excel, estado')
-            .eq('modo', 'real').eq('nit_adquiriente', nit).in(columna, lote));
+            .eq('modo', 'real').eq('perfil_id', Number(perfilId)).in(columna, lote));
           for (const f of r) filas.set(f.id, { id: f.id, numero: f.numero, numeroExcel: f.numero_excel, estado: f.estado });
         }
       }
@@ -103,7 +103,7 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
   };
 
   const aUsuario = (f) => f && ({
-    id: f.id, usuario: f.usuario, claveHash: f.clave_hash, rol: f.rol, perfilId: f.perfil_id, activo: f.activo,
+    id: f.id, usuario: f.usuario, claveHash: f.clave_hash, rol: f.rol, perfilId: f.perfil_id, modulos: f.modulos ?? null, activo: f.activo,
     creadoEn: f.creado_en, ultimoIngreso: f.ultimo_ingreso,
   });
   const usuarios = {
@@ -111,21 +111,40 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
     obtener: async (id) => usuarioPublico(aUsuario(revisar(await db.from('usuarios').select('*').eq('id', Number(id)).maybeSingle()))),
     /** Incluye claveHash: solo para el inicio de sesión. */
     porNombre: async (usuario) => aUsuario(revisar(await db.from('usuarios').select('*').eq('usuario', usuario).maybeSingle())),
-    crear: async ({ usuario, claveHash, rol, perfilId }) => usuarioPublico(aUsuario(revisar(await db.from('usuarios')
-      .insert({ usuario, clave_hash: claveHash, rol, perfil_id: perfilId ?? null }).select('*').single()))),
+    crear: async ({ usuario, claveHash, rol, perfilId, modulos = null }) => usuarioPublico(aUsuario(revisar(await db.from('usuarios')
+      .insert({ usuario, clave_hash: claveHash, rol, perfil_id: perfilId ?? null, modulos }).select('*').single()))),
     actualizar: async (id, c) => {
       const cambios = {};
+      if ('usuario' in c) cambios.usuario = c.usuario;
       if ('claveHash' in c) cambios.clave_hash = c.claveHash;
       if ('rol' in c) cambios.rol = c.rol;
       if ('perfilId' in c) cambios.perfil_id = c.perfilId;
       if ('activo' in c) cambios.activo = c.activo;
+      if ('modulos' in c) cambios.modulos = c.modulos;
       if ('ultimoIngreso' in c) cambios.ultimo_ingreso = c.ultimoIngreso;
       return usuarioPublico(aUsuario(revisar(await db.from('usuarios').update(cambios).eq('id', Number(id)).select('*').single())));
     },
     eliminar: async (id) => { revisar(await db.from('usuarios').delete().eq('id', Number(id))); },
   };
 
-  return { tipo: 'supabase', perfiles, envios, usuarios };
+  // Códigos de acceso (OTP). Solo se guarda el hash del código.
+  const aCodigo = (f) => f && ({ id: f.id, correo: f.correo, codigoHash: f.codigo_hash, expiraEn: f.expira_en, intentos: f.intentos, usado: f.usado, creadoEn: f.creado_en });
+  const codigos = {
+    /** Guarda un código nuevo y borra los anteriores de ese correo. */
+    crear: async ({ correo, codigoHash, expiraEn }) => {
+      revisar(await db.from('codigos_acceso').delete().eq('correo', correo));
+      return aCodigo(revisar(await db.from('codigos_acceso').insert({ correo, codigo_hash: codigoHash, expira_en: expiraEn }).select('*').single()));
+    },
+    ultimo: async (correo) => aCodigo(revisar(await db.from('codigos_acceso').select('*').eq('correo', correo).order('id', { ascending: false }).limit(1).maybeSingle())),
+    actualizar: async (id, c) => {
+      const cambios = {};
+      if ('intentos' in c) cambios.intentos = c.intentos;
+      if ('usado' in c) cambios.usado = c.usado;
+      revisar(await db.from('codigos_acceso').update(cambios).eq('id', Number(id)));
+    },
+  };
+
+  return { tipo: 'supabase', perfiles, envios, usuarios, codigos };
 }
 
 module.exports = { crearAlmacenSupabase };

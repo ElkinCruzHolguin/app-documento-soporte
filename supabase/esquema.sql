@@ -52,11 +52,28 @@ create table if not exists public.usuarios (
   check (rol = 'admin' or perfil_id is not null)
 );
 create index if not exists envios_perfil on public.envios (perfil_id, id desc);
+-- Módulos que ve el usuario (lista de claves, ver src/dominio/modulos.js). null = todos los de su compañía.
+-- Los de la compañía van en perfiles.config.modulos.
+alter table public.usuarios add column if not exists modulos jsonb;
+
+-- Códigos de acceso de un solo uso (OTP) enviados al correo. Solo se guarda el hash (HMAC con APP_SECRETO).
+-- Pedir un código nuevo borra los anteriores de ese correo.
+create table if not exists public.codigos_acceso (
+  id bigint generated always as identity primary key,
+  correo text not null,
+  codigo_hash text not null,
+  expira_en timestamptz not null,
+  intentos integer not null default 0,
+  usado boolean not null default false,
+  creado_en timestamptz not null default now()
+);
+create index if not exists codigos_acceso_correo on public.codigos_acceso (correo, id desc);
 
 alter table public.perfiles enable row level security;
 alter table public.envios enable row level security;
 alter table public.usuarios enable row level security;
-revoke all on public.perfiles, public.envios, public.usuarios from anon, authenticated;
+alter table public.codigos_acceso enable row level security;
+revoke all on public.perfiles, public.envios, public.usuarios, public.codigos_acceso from anon, authenticated;
 
 -- Deja un solo perfil activo (en una transacción).
 create or replace function public.activar_perfil(p_id bigint) returns void
@@ -82,4 +99,4 @@ end $$;
 
 revoke execute on function public.activar_perfil(bigint), public.tomar_consecutivo(bigint, bigint) from public, anon, authenticated;
 grant execute on function public.activar_perfil(bigint), public.tomar_consecutivo(bigint, bigint) to service_role;
-grant all on public.perfiles, public.envios, public.usuarios to service_role;
+grant all on public.perfiles, public.envios, public.usuarios, public.codigos_acceso to service_role;

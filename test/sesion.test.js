@@ -60,17 +60,17 @@ test('login, roles y aislamiento entre compañías', async () => {
 
     // Usuarios: validaciones
     const crearUsuario = (cuerpo) => llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo });
-    assert.strictEqual((await crearUsuario({ usuario: 'vitro', clave: 'corta', perfilId: vitro.id })).status, 400);
+    assert.strictEqual((await crearUsuario({ usuario: 'vitro@ejemplo.com', clave: 'corta', perfilId: vitro.id })).status, 400);
     assert.strictEqual((await crearUsuario({ usuario: 'jefe', clave: 'clave-larga-123', perfilId: vitro.id })).status, 400);
-    assert.strictEqual((await crearUsuario({ usuario: 'sinperfil', clave: 'clave-larga-123' })).status, 400);
-    assert.strictEqual((await crearUsuario({ usuario: 'otroadmin', clave: 'clave-larga-123', rol: 'admin' })).status, 400);
-    const uVitro = (await crearUsuario({ usuario: 'Vitro', clave: 'clave-vitro-123', perfilId: vitro.id })).datos;
-    assert.strictEqual(uVitro.usuario, 'vitro');
+    assert.strictEqual((await crearUsuario({ usuario: 'sinperfil@ejemplo.com', clave: 'clave-larga-123' })).status, 400);
+    assert.strictEqual((await crearUsuario({ usuario: 'otro@ejemplo.com', clave: 'clave-larga-123', rol: 'superusuario', perfilId: vitro.id })).status, 400);
+    const uVitro = (await crearUsuario({ usuario: 'Vitro@Ejemplo.com', clave: 'clave-vitro-123', perfilId: vitro.id })).datos;
+    assert.strictEqual(uVitro.usuario, 'vitro@ejemplo.com');
     assert.ok(!JSON.stringify(uVitro).includes('scrypt'));
-    assert.strictEqual((await crearUsuario({ usuario: 'vitro', clave: 'clave-vitro-123', perfilId: vitro.id })).status, 400);
-    await crearUsuario({ usuario: 'atica', clave: 'clave-atica-123', perfilId: atica.id });
+    assert.strictEqual((await crearUsuario({ usuario: 'vitro@ejemplo.com', clave: 'clave-vitro-123', perfilId: vitro.id })).status, 400);
+    await crearUsuario({ usuario: 'atica@ejemplo.com', clave: 'clave-atica-123', perfilId: atica.id });
     const lista = (await llamar('/api/usuarios', { cookie: admin })).datos;
-    assert.deepStrictEqual(lista.map((u) => u.usuario), ['atica', 'vitro']);
+    assert.deepStrictEqual(lista.map((u) => u.usuario), ['atica@ejemplo.com', 'vitro@ejemplo.com']);
     assert.ok(!JSON.stringify(lista).includes('scrypt'));
 
     // Historial con envíos de las dos compañías
@@ -79,7 +79,7 @@ test('login, roles y aislamiento entre compañías', async () => {
     const idAtica = await almacen.envios.registrar({ perfilId: atica.id, perfilNombre: 'Atica QA', modo: 'real', estado: 'aceptado', numero: 'A1', numeroExcel: 'A1', nitAdquiriente: '900024398' });
 
     // Usuario de compañía: solo su perfil y su historial; nada de Administración
-    const cVitro = await entrar('vitro', 'clave-vitro-123');
+    const cVitro = await entrar('vitro@ejemplo.com', 'clave-vitro-123');
     const est = (await llamar('/api/estado', { cookie: cVitro })).datos;
     assert.strictEqual(est.usuario.rol, 'empresa');
     assert.strictEqual(est.perfil.nombre, 'Vitro QA');
@@ -102,17 +102,17 @@ test('login, roles y aislamiento entre compañías', async () => {
     await llamar(`/api/usuarios/${uVitro.id}`, { cookie: admin, metodo: 'PUT', cuerpo: { perfilId: atica.id } });
     assert.strictEqual((await llamar('/api/estado', { cookie: cVitro })).status, 401);
     await llamar(`/api/usuarios/${uVitro.id}`, { cookie: admin, metodo: 'PUT', cuerpo: { perfilId: vitro.id, activo: false } });
-    assert.strictEqual((await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'vitro', clave: 'clave-vitro-123' } })).status, 401);
+    assert.strictEqual((await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'vitro@ejemplo.com', clave: 'clave-vitro-123' } })).status, 401);
     await llamar(`/api/usuarios/${uVitro.id}`, { cookie: admin, metodo: 'PUT', cuerpo: { activo: true, clave: 'nueva-clave-vitro' } });
-    assert.strictEqual((await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'vitro', clave: 'clave-vitro-123' } })).status, 401);
-    await entrar('vitro', 'nueva-clave-vitro');
+    assert.strictEqual((await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'vitro@ejemplo.com', clave: 'clave-vitro-123' } })).status, 401);
+    await entrar('vitro@ejemplo.com', 'nueva-clave-vitro');
 
     // Salir borra la cookie
     assert.match((await llamar('/api/logout', { cookie: admin, metodo: 'POST' })).cookie, /^ds_sesion=$/);
 
     // Bloqueo tras 5 intentos fallidos
-    for (let i = 0; i < 5; i++) await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'atica', clave: 'mala' } });
-    assert.strictEqual((await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'atica', clave: 'clave-atica-123' } })).status, 429);
+    for (let i = 0; i < 5; i++) await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'atica@ejemplo.com', clave: 'mala' } });
+    assert.strictEqual((await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'atica@ejemplo.com', clave: 'clave-atica-123' } })).status, 429);
   } finally {
     s.close();
   }

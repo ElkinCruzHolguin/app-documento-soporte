@@ -12,6 +12,7 @@ function crearAlmacenArchivo(dir) {
   const ARCHIVO = path.join(dir, 'parametros.json');
   const ARCHIVO_ENVIOS = path.join(dir, 'envios.json');
   const ARCHIVO_USUARIOS = path.join(dir, 'usuarios.json');
+  const ARCHIVO_CODIGOS = path.join(dir, 'codigos.json');
 
   function llave() {
     if (process.env.APP_SECRETO) return llaveDesdeTexto(process.env.APP_SECRETO);
@@ -91,10 +92,10 @@ function crearAlmacenArchivo(dir) {
       guardarJson(ARCHIVO_ENVIOS, lista);
       return id;
     },
-    /** Envíos reales previos de esos números del Excel para ese NIT (ver resumirPrevios). */
-    previos: async (nit, numerosExcel) => {
+    /** Envíos reales previos de esos números del Excel en esa compañía (ver resumirPrevios). */
+    previos: async (perfilId, numerosExcel) => {
       const buscados = new Set(numerosExcel);
-      return resumirPrevios(leerEnvios().filter((e) => e.modo === 'real' && e.nitAdquiriente === nit), buscados);
+      return resumirPrevios(leerEnvios().filter((e) => e.modo === 'real' && e.perfilId === Number(perfilId)), buscados);
     },
     listar: async ({ buscar = '', limite = 100, perfilId = null } = {}) => {
       const q = buscar.toUpperCase();
@@ -113,10 +114,10 @@ function crearAlmacenArchivo(dir) {
     obtener: async (id) => usuarioPublico(leerUsuarios().find((u) => u.id === Number(id))),
     /** Incluye claveHash: solo para el inicio de sesión. */
     porNombre: async (usuario) => leerUsuarios().find((u) => u.usuario === usuario) || null,
-    crear: async ({ usuario, claveHash, rol, perfilId }) => {
+    crear: async ({ usuario, claveHash, rol, perfilId, modulos = null }) => {
       const lista = leerUsuarios();
       if (lista.some((u) => u.usuario === usuario)) throw fallo(400, 'Ya existe un usuario con ese nombre.');
-      const u = { id: lista.reduce((m, x) => Math.max(m, x.id), 0) + 1, usuario, claveHash, rol, perfilId: perfilId ?? null, activo: true, creadoEn: new Date().toISOString() };
+      const u = { id: lista.reduce((m, x) => Math.max(m, x.id), 0) + 1, usuario, claveHash, rol, perfilId: perfilId ?? null, modulos, activo: true, creadoEn: new Date().toISOString() };
       lista.push(u);
       guardarJson(ARCHIVO_USUARIOS, lista);
       return usuarioPublico(u);
@@ -125,6 +126,7 @@ function crearAlmacenArchivo(dir) {
       const lista = leerUsuarios();
       const u = lista.find((x) => x.id === Number(id));
       if (!u) throw fallo(404, 'Usuario no encontrado.');
+      if (cambios.usuario && lista.some((x) => x.usuario === cambios.usuario && x.id !== u.id)) throw fallo(400, 'Ya existe un usuario con ese nombre.');
       Object.assign(u, cambios);
       guardarJson(ARCHIVO_USUARIOS, lista);
       return usuarioPublico(u);
@@ -132,7 +134,29 @@ function crearAlmacenArchivo(dir) {
     eliminar: async (id) => guardarJson(ARCHIVO_USUARIOS, leerUsuarios().filter((u) => u.id !== Number(id))),
   };
 
-  return { tipo: 'archivo', perfiles, envios, usuarios };
+  // Códigos de acceso (OTP). Solo se guarda el hash del código.
+  const leerCodigos = () => (fs.existsSync(ARCHIVO_CODIGOS) ? JSON.parse(fs.readFileSync(ARCHIVO_CODIGOS, 'utf8')) : []);
+  const codigos = {
+    /** Guarda un código nuevo y anula los anteriores de ese correo. */
+    crear: async ({ correo, codigoHash, expiraEn }) => {
+      const ahora = Date.now();
+      const lista = leerCodigos().filter((c) => c.correo !== correo && Date.parse(c.expiraEn) > ahora);
+      const c = { id: lista.reduce((m, x) => Math.max(m, x.id), 0) + 1, correo, codigoHash, expiraEn, intentos: 0, usado: false, creadoEn: new Date().toISOString() };
+      lista.push(c);
+      guardarJson(ARCHIVO_CODIGOS, lista);
+      return c;
+    },
+    /** Último código de ese correo, o null. */
+    ultimo: async (correo) => leerCodigos().filter((c) => c.correo === correo).sort((a, b) => b.id - a.id)[0] || null,
+    actualizar: async (id, cambios) => {
+      const lista = leerCodigos();
+      const c = lista.find((x) => x.id === Number(id));
+      if (c) Object.assign(c, cambios);
+      guardarJson(ARCHIVO_CODIGOS, lista);
+    },
+  };
+
+  return { tipo: 'archivo', perfiles, envios, usuarios, codigos };
 }
 
 module.exports = { crearAlmacenArchivo };

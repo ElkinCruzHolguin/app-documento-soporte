@@ -31,6 +31,6 @@ function resumirPrevios(filas, buscados) {
 }
 
 // Usuario sin el hash de la contraseña.
-const usuarioPublico = (u) => u && ({ id: u.id, usuario: u.usuario, rol: u.rol, perfilId: u.perfilId ?? null, activo: u.activo !== false, creadoEn: u.creadoEn, ultimoIngreso: u.ultimoIngreso || null });
+const usuarioPublico = (u) => u && ({ id: u.id, usuario: u.usuario, rol: u.rol, perfilId: u.perfilId ?? null, modulos: Array.isArray(u.modulos) ? u.modulos : null, activo: u.activo !== false, creadoEn: u.creadoEn, ultimoIngreso: u.ultimoIngreso || null });
 
 module.exports = { fallo, publico, resumenEnvio, resumirPrevios, usuarioPublico };

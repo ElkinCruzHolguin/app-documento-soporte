@@ -14,6 +14,16 @@ function leerEntorno(env = process.env) {
     autenticacion,
     secreto: env.APP_SECRETO || '',
     enVercel: !!env.VERCEL,
+    // Ingreso con código de un solo uso (OTP) enviado al correo.
+    correoAdmin: String(env.APP_CORREO || '').trim().toLowerCase(), // correo del super administrador (opcional)
+    correo: {
+      llaveResend: env.RESEND_API_KEY || '',
+      llaveMailgun: env.MAILGUN_API_KEY || '',
+      dominioMailgun: env.MAILGUN_DOMINIO || '',
+      regionMailgun: String(env.MAILGUN_REGION || 'us').toLowerCase(), // 'us' o 'eu', según la región de la cuenta
+      remitente: env.CORREO_REMITENTE || '',
+      consola: env.CORREO_CONSOLA === '1', // solo local: el código se escribe en la consola en vez de enviarse
+    },
   };
 }
 

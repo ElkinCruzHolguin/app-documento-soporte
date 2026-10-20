@@ -40,13 +40,12 @@ function crearServicioDocumentos({ companias, perfiles, envios, saphety, excel, 
       });
 
       // El historial dice qué documentos del Excel (PREFIJO + FOLIO) ya se enviaron, en cualquier modo de numeración.
-      if (compania.config.nit) {
-        const previos = await envios.previos(soloDigitos(compania.config.nit), [...vistos]);
-        for (const d of documentos) {
-          const p = previos.get(d.numero);
-          if (p && p.aceptadoComo) d.errores.push(mensajeYaAceptado(d.numero, p.aceptadoComo));
-          else if (p && p.errorEnvio) d.advertencias.push(`El último envío de ${d.numero} quedó con error de conexión: revisa en Saphety si se creó antes de reenviarlo.`);
-        }
+      // Se busca solo en esta compañía: dos compañías con el mismo NIT (p. ej. QA y producción) son ambientes independientes.
+      const previos = await envios.previos(compania.id, [...vistos]);
+      for (const d of documentos) {
+        const p = previos.get(d.numero);
+        if (p && p.aceptadoComo) d.errores.push(mensajeYaAceptado(d.numero, p.aceptadoComo));
+        else if (p && p.errorEnvio) d.advertencias.push(`El último envío de ${d.numero} quedó con error de conexión: revisa en Saphety si se creó antes de reenviarlo.`);
       }
       return { hoja: libro.hoja, columnas: libro.columnas, documentos };
     },
@@ -68,7 +67,7 @@ function crearServicioDocumentos({ companias, perfiles, envios, saphety, excel, 
       const nit = soloDigitos(cfg.nit);
       const numeroExcel = previa.resumen.numero;
       if (real) {
-        const p = (await envios.previos(nit, [numeroExcel])).get(numeroExcel);
+        const p = (await envios.previos(compania.id, [numeroExcel])).get(numeroExcel);
         if (p && p.aceptadoComo) return { estado: 'con_errores', errores: [mensajeYaAceptado(numeroExcel, p.aceptadoComo)], json: previa.json };
       }
 

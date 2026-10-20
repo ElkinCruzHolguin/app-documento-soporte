@@ -163,9 +163,18 @@ test('flujo completo', async () => {
     assert.strictEqual(sinToken.datos.detener, true);
     // El error de envío queda en el historial y la fila muestra un aviso (no bloquea)
     const { crearAlmacenArchivo } = require('../src/repositorios/archivo');
-    const previos = await crearAlmacenArchivo(process.env.DATA_DIR).envios.previos('860031699', ['DSE7471', 'DSE7460']);
+    const previos = await crearAlmacenArchivo(process.env.DATA_DIR).envios.previos(perfil.id, ['DSE7471', 'DSE7460']);
     assert.deepStrictEqual(previos.get('DSE7471'), { aceptadoComo: null, errorEnvio: true });
     assert.deepStrictEqual(previos.get('DSE7460'), { aceptadoComo: 'DSE7460', errorEnvio: false });
+
+    // Otra compañía con el mismo NIT (p. ej. producción frente a QA) es un ambiente independiente:
+    // lo enviado en una no marca como «ya aceptado» el mismo documento en la otra.
+    const json = (cuerpo) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+    const prd = (await llamar('/api/perfiles', json({ nombre: 'Vitro PRD', config: { ...perfil.config, nit: '860031699' } }))).datos;
+    assert.strictEqual((await llamar(`/api/perfiles/${prd.id}/activar`, { method: 'POST' })).status, 200);
+    const enPrd = (await llamar('/api/convertir', { method: 'POST', body: await excelDePrueba() })).datos.documentos;
+    assert.deepStrictEqual(enPrd.map((d) => d.errores.some((e) => /ya fue aceptado/.test(e))), [false, false, false]);
+    assert.strictEqual((await crearAlmacenArchivo(process.env.DATA_DIR).envios.previos(prd.id, ['DSE7460'])).size, 0);
   } finally {
     sApp.close();
     sMock.close();
