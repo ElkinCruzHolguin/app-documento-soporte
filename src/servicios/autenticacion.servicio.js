@@ -95,7 +95,7 @@ function crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguri
       if (seguridad.bloqueado(llave)) throw fallo(429, BLOQUEADO);
 
       let datos = null;
-      if (seguridad.igualSeguro(nombre, entorno.usuarioAdmin.toLowerCase()) && seguridad.igualSeguro(contrasena, entorno.claveAdmin)) {
+      if (entorno.adminEntorno && seguridad.igualSeguro(nombre, entorno.usuarioAdmin.toLowerCase()) && seguridad.igualSeguro(contrasena, entorno.claveAdmin)) {
         datos = { id: 0, usuario: nombre, rol: 'admin', perfilId: null };
       } else {
         const u = await usuarios.porNombre(nombre);

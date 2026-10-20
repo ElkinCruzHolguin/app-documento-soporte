@@ -8,7 +8,7 @@
     "start": "node src/server.js",
     "dev": "node --env-file-if-exists=.env src/server.js",
     "migrar": "node --env-file=.env scripts/migrar-a-supabase.js",
-    "test": "node --test test/mapper.test.js test/flujo.test.js test/sesion.test.js test/servicios.test.js test/emitidos.test.js test/recibidos.test.js test/dashboard.test.js test/cuenta.test.js test/otp.test.js test/modulos.test.js test/roles.test.js test/ligadas.test.js test/equipo.test.js"
+    "test": "node --test test/mapper.test.js test/flujo.test.js test/sesion.test.js test/servicios.test.js test/emitidos.test.js test/recibidos.test.js test/dashboard.test.js test/cuenta.test.js test/otp.test.js test/modulos.test.js test/roles.test.js test/ligadas.test.js test/equipo.test.js test/sin-admin-entorno.test.js"
   },
   "engines": {
     "node": ">=22"

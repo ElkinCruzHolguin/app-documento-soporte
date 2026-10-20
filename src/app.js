@@ -13,7 +13,7 @@ function crearApp(entorno = leerEntorno()) {
 
   if (!entorno.autenticacion && entorno.enVercel) {
     // Publicada en internet sin super administrador: no se atiende nada.
-    app.use((req, res) => res.status(503).send('Configura APP_USUARIO y APP_CLAVE en las variables de entorno de Vercel.'));
+    app.use((req, res) => res.status(503).send('Configura APP_AUTENTICACION=1 (o APP_USUARIO y APP_CLAVE) en las variables de entorno de Vercel.'));
   }
   app.use(express.json({ limit: '2mb' }));
   app.use(express.static(path.join(__dirname, '..', 'public')));

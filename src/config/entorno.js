@@ -4,13 +4,16 @@
 function leerEntorno(env = process.env) {
   const usuarioAdmin = env.APP_USUARIO || '';
   const claveAdmin = env.APP_CLAVE || '';
-  // Con APP_USUARIO y APP_CLAVE se exige inicio de sesión (obligatorio en Vercel).
-  const autenticacion = !!(usuarioAdmin && claveAdmin);
+  // El super administrador de entorno (APP_USUARIO/APP_CLAVE) es opcional: los administradores pueden ser
+  // usuarios de la tabla. Con él o con APP_AUTENTICACION=1 se exige inicio de sesión (obligatorio en Vercel).
+  const adminEntorno = !!(usuarioAdmin && claveAdmin);
+  const autenticacion = adminEntorno || env.APP_AUTENTICACION === '1';
   return {
     puerto: Number(env.PORT || 3000),
     host: env.HOST || (autenticacion ? '0.0.0.0' : '127.0.0.1'),
     usuarioAdmin,
     claveAdmin,
+    adminEntorno,
     autenticacion,
     secreto: env.APP_SECRETO || '',
     enVercel: !!env.VERCEL,

@@ -17,7 +17,8 @@ Las variables están documentadas en `.env.example`. Copia ese archivo como `.en
 ## Desplegar (GitHub + Supabase + Vercel)
 1. **Supabase**: en el SQL Editor ejecuta `supabase/esquema.sql`. Crea las tablas `perfiles` y `envios` con RLS activo y sin políticas: solo el servidor, con la service_role key, puede leerlas.
 2. **Vercel**: importa el repositorio de GitHub (Framework: Other) y en *Settings → Environment Variables* define:
-   - `APP_USUARIO`, `APP_CLAVE`: super administrador de la app. Sin ellas, la app en Vercel no atiende.
+   - `APP_AUTENTICACION=1`: exige inicio de sesión aunque no haya super administrador de entorno. En Vercel debe estar esta o `APP_USUARIO`/`APP_CLAVE`; sin ninguna, la app no atiende.
+   - `APP_USUARIO`, `APP_CLAVE` (opcionales): super administrador de entorno. Si los administradores son usuarios de la tabla (rol Administrador), se pueden quitar.
    - `APP_CORREO`, `CORREO_REMITENTE`, `MAILGUN_API_KEY`, `MAILGUN_DOMINIO` (o `RESEND_API_KEY`): ingreso con código al correo (ver `.env.example`).
    - `APP_SECRETO`: llave larga y aleatoria para cifrar la contraseña de Saphety. No la cambies después.
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`: en Supabase, *Project Settings → API*.
@@ -31,7 +32,7 @@ La contraseña de Saphety se escribe en Administración, se guarda cifrada (AES-
   1. Usuario (correo) y contraseña. Si son correctos, el servidor todavía no emite la sesión: deja un estado «pendiente» de 10 minutos (cookie firmada aparte, que no sirve como sesión).
   2. Envía un código de 6 dígitos al correo de la cuenta (vence en 10 minutos, sirve una vez, 5 intentos) y solo al validarlo emite la sesión. Solo se guarda el hash del código (tabla `codigos_acceso`).
   - El envío usa Mailgun (`MAILGUN_API_KEY`, `MAILGUN_DOMINIO`) o Resend (`RESEND_API_KEY`), más `CORREO_REMITENTE`. Sin ellas se entra solo con contraseña, como antes.
-- **Super administrador**: `APP_USUARIO`/`APP_CLAVE`; su código llega a `APP_CORREO`. Ve todo y crea o modifica compañías y usuarios.
+- **Super administrador de entorno** (opcional): `APP_USUARIO`/`APP_CLAVE`; su código llega a `APP_CORREO`. No aparece en la lista de usuarios. Ve todo y crea o modifica compañías y usuarios.
 - **Usuarios administradores**: en *Administración › Usuarios* un administrador puede darle el rol «Administrador» a otro usuario (o quitárselo). Tiene los mismos permisos que el super administrador; nadie puede quitarse a sí mismo el rol, desactivarse ni eliminarse. El rol sale de la cuenta con la que se entra, nunca del correo: un usuario de compañía con el mismo correo que `APP_CORREO` sigue siendo solo de compañía.
 - **Compañías**: solo el super administrador las crea y modifica (Administración › «Nueva compañía»). Cada una tiene su conexión con Saphety, sus parámetros, sus usuarios y su historial.
 - **Usuarios de compañía**: se crean en Administración › Usuarios, cada uno ligado a una compañía. **El usuario es su correo.** Los usuarios antiguos que no son correo siguen entrando solo con contraseña (sin código) hasta que el administrador les pone su correo («Cambiar correo»). Solo cargan y envían con su compañía, solo ven su historial y ven la configuración de su compañía en solo lectura («Mi compañía»). El servidor lo exige en cada petición; desactivar un usuario o cambiarle el perfil cierra su sesión al instante.
