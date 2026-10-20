@@ -39,6 +39,8 @@
   </section>
 </main>
 <script>
+// Al llegar a esta pantalla se olvida el menú guardado de la sesión anterior (ver comun.js).
+try { sessionStorage.removeItem('ds_menu'); } catch { /* sin almacenamiento */ }
 const $ = (id) => document.getElementById(id);
 const form = $('form');
 const formCodigo = $('formCodigo');
