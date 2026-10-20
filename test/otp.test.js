@@ -12,15 +12,17 @@ process.env.APP_USUARIO = 'Jefe';
 process.env.APP_CLAVE = 'clave-del-jefe-123';
 process.env.APP_CORREO = 'Jefe@Ejemplo.com';
 process.env.APP_SECRETO = 'secreto-de-prueba';
+process.env.CORREO_CONSOLA = '1';
 const { app } = require('../src/server');
 const { crearAlmacenArchivo } = require('../src/repositorios/archivo');
 const { hashClave } = require('../src/infraestructura/seguridad');
 const { crearEnviadorCorreo, bandejaLocal } = require('../src/infraestructura/correo');
-const { esCorreo } = require('../src/dominio/correo');
+const { esCorreo, enmascararCorreo } = require('../src/dominio/correo');
 
 test('formato del correo', () => {
   assert.ok(esCorreo('Ana.Perez+ds@Vitro.com.co'));
   for (const malo of ['vitro', 'a@b', '@vitro.com', 'a b@vitro.com', '']) assert.ok(!esCorreo(malo), malo);
+  assert.strictEqual(enmascararCorreo('elkin.cruz@jtc.com.co'), 'e***z@jtc.com.co');
 });
 
 test('enviador de correo: Mailgun, Resend, local y Vercel sin configurar', async () => {
@@ -52,12 +54,15 @@ test('enviador de correo: Mailgun, Resend, local y Vercel sin configurar', async
   await assert.rejects(fallaResend.enviar({ para: 'a@b.co', asunto: 'x' }), /HTTP 403/);
 
   assert.strictEqual(crearEnviadorCorreo({ enVercel: true }).disponible, false);
-  assert.strictEqual(crearEnviadorCorreo({ enVercel: false }).disponible, true);
+  assert.strictEqual(crearEnviadorCorreo({ enVercel: false }).disponible, false);
+  assert.strictEqual(crearEnviadorCorreo({ enVercel: false, correo: { consola: true } }).disponible, true);
+  assert.strictEqual(crearEnviadorCorreo({ enVercel: true, correo: { consola: true } }).disponible, false);
 });
 
-test('login con código al correo', async () => {
+test('login en dos pasos: contraseña y luego código al correo', async () => {
   const s = await new Promise((resolve) => { const x = http.createServer(app).listen(0, '127.0.0.1', () => resolve(x)); });
   const base = `http://127.0.0.1:${s.address().port}`;
+  const cookiesDe = (r) => (r.headers.getSetCookie ? r.headers.getSetCookie() : [r.headers.get('set-cookie') || '']).map((c) => c.split(';')[0]);
   const llamar = async (ruta, { cookie, metodo = 'GET', cuerpo } = {}) => {
     const r = await fetch(base + ruta, {
       method: metodo,
@@ -65,91 +70,108 @@ test('login con código al correo', async () => {
       body: cuerpo ? JSON.stringify(cuerpo) : undefined,
     });
     const datos = await r.json().catch(() => null);
-    return { status: r.status, datos, cookie: (r.headers.get('set-cookie') || '').split(';')[0] };
+    const cookies = cookiesDe(r);
+    return { status: r.status, datos, sesion: cookies.find((c) => c.startsWith('ds_sesion=')) || '', pendiente: cookies.find((c) => c.startsWith('ds_2fa=')) || '' };
   };
-  const pedir = (correo) => llamar('/api/login/codigo', { metodo: 'POST', cuerpo: { correo } });
-  const verificar = (correo, codigo) => llamar('/api/login/verificar', { metodo: 'POST', cuerpo: { correo, codigo } });
+  const paso1 = (usuario, clave) => llamar('/api/login', { metodo: 'POST', cuerpo: { usuario, clave } });
+  const paso2 = (pendiente, codigo) => llamar('/api/login/verificar', { metodo: 'POST', cookie: pendiente, cuerpo: { codigo } });
   const ultimoCodigo = (para) => {
     const m = [...bandejaLocal].reverse().find((x) => x.para === para);
     return m && m.texto.match(/\b(\d{6})\b/)[1];
   };
+  const entrar = async (usuario, clave, correo) => {
+    const r1 = await paso1(usuario, clave);
+    assert.strictEqual(r1.status, 200, JSON.stringify(r1.datos));
+    assert.strictEqual(r1.datos.paso, 'codigo');
+    assert.strictEqual(r1.sesion, '', 'la contraseña sola no emite la sesión');
+    const r2 = await paso2(r1.pendiente, ultimoCodigo(correo));
+    assert.strictEqual(r2.status, 200, JSON.stringify(r2.datos));
+    return r2.sesion;
+  };
 
   try {
-    assert.deepStrictEqual((await llamar('/api/login/opciones')).datos, { login: true, codigo: true, clave: true });
-
-    // Correo inválido o no registrado: no se envía nada y la respuesta no revela si existe
-    assert.strictEqual((await pedir('vitro')).status, 400);
-    const desconocido = await pedir('nadie@ejemplo.com');
-    assert.strictEqual(desconocido.status, 200);
+    // Contraseña mala: ni sesión ni código
+    assert.strictEqual((await paso1('jefe', 'mala')).status, 401);
     assert.strictEqual(bandejaLocal.length, 0);
 
-    // El super administrador entra con APP_CORREO (sin distinguir mayúsculas)
-    assert.strictEqual((await pedir('JEFE@ejemplo.com')).datos.mensaje, desconocido.datos.mensaje);
-    const cAdmin = await verificar('jefe@ejemplo.com', ultimoCodigo('jefe@ejemplo.com'));
-    assert.strictEqual(cAdmin.status, 200, JSON.stringify(cAdmin.datos));
-    assert.strictEqual((await llamar('/api/estado', { cookie: cAdmin.cookie })).datos.usuario.rol, 'admin');
-    // La contraseña sigue sirviendo como respaldo
-    const admin = (await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'jefe', clave: 'clave-del-jefe-123' } })).cookie;
-
-    // Usuario de compañía creado solo con su correo (sin contraseña)
-    const vitro = (await llamar('/api/perfiles', { cookie: admin, metodo: 'POST', cuerpo: { nombre: 'Vitro QA', config: {} } })).datos;
-    assert.strictEqual((await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: 'vitro', perfilId: vitro.id } })).status, 400);
-    assert.strictEqual((await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: 'jefe@ejemplo.com', perfilId: vitro.id } })).status, 400);
-    const ana = (await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: ' Ana@Vitro.com ', perfilId: vitro.id } })).datos;
-    assert.strictEqual(ana.usuario, 'ana@vitro.com');
-
-    await pedir('ana@vitro.com');
-    const codigo = ultimoCodigo('ana@vitro.com');
-    assert.match(codigo, /^\d{6}$/);
-    assert.ok(!fs.readFileSync(path.join(process.env.DATA_DIR, 'codigos.json'), 'utf8').includes(codigo), 'el código no se guarda en claro');
-    const otro = codigo === '000000' ? '111111' : '000000';
-    assert.strictEqual((await verificar('ana@vitro.com', otro)).status, 401);
-    const cAna = await verificar('ana@vitro.com', codigo);
-    assert.strictEqual(cAna.status, 200);
-    assert.match(cAna.cookie, /^ds_sesion=.+/);
-    const est = (await llamar('/api/estado', { cookie: cAna.cookie })).datos;
-    assert.strictEqual(est.usuario.usuario, 'ana@vitro.com');
-    assert.strictEqual(est.perfil.nombre, 'Vitro QA');
+    // Super administrador: APP_USUARIO/APP_CLAVE y el código llega a APP_CORREO
+    const r1 = await paso1('jefe', 'clave-del-jefe-123');
+    assert.strictEqual(r1.datos.destino, 'j***e@ejemplo.com');
+    assert.match(r1.pendiente, /^ds_2fa=.+/);
+    // El estado pendiente no sirve como sesión
+    assert.strictEqual((await llamar('/api/estado', { cookie: r1.pendiente.replace('ds_2fa=', 'ds_sesion=') })).status, 401);
+    const codigoAdmin = ultimoCodigo('jefe@ejemplo.com');
+    assert.ok(!fs.readFileSync(path.join(process.env.DATA_DIR, 'codigos.json'), 'utf8').includes(`"${codigoAdmin}"`), 'el código no se guarda en claro');
+    const otro = codigoAdmin === '000000' ? '111111' : '000000';
+    assert.strictEqual((await paso2(r1.pendiente, otro)).status, 401);
+    assert.strictEqual((await paso2('', codigoAdmin)).status, 401, 'sin el paso 1 no hay código que valga');
+    const ok = await paso2(r1.pendiente, codigoAdmin);
+    assert.strictEqual(ok.status, 200);
+    assert.match(ok.sesion, /^ds_sesion=.+/);
+    const admin = ok.sesion;
+    assert.strictEqual((await llamar('/api/estado', { cookie: admin })).datos.usuario.rol, 'admin');
     // Un código sirve una sola vez
-    assert.strictEqual((await verificar('ana@vitro.com', codigo)).status, 401);
-    // Sin contraseña asignada no se puede entrar con contraseña
-    assert.strictEqual((await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'ana@vitro.com', clave: '' } })).status, 401);
+    assert.strictEqual((await paso2(r1.pendiente, codigoAdmin)).status, 401);
 
-    // Pedir otro código anula el anterior; 5 intentos fallidos anulan el código
-    await pedir('ana@vitro.com');
-    const viejo = ultimoCodigo('ana@vitro.com');
-    await pedir('ana@vitro.com');
-    const nuevo = ultimoCodigo('ana@vitro.com');
-    if (viejo !== nuevo) assert.strictEqual((await verificar('ana@vitro.com', viejo)).status, 401);
-    const malo = nuevo === '999999' ? '888888' : '999999';
-    for (let i = 0; i < 5; i++) assert.ok([401, 429].includes((await verificar('ana@vitro.com', malo)).status));
-    assert.strictEqual((await verificar('ana@vitro.com', nuevo)).status, 429);
-    const guardado = JSON.parse(fs.readFileSync(path.join(process.env.DATA_DIR, 'codigos.json'), 'utf8')).find((c) => c.correo === 'ana@vitro.com');
-    assert.ok(guardado.intentos >= 3 && !guardado.usado);
+    // Usuario de compañía con el MISMO correo que APP_CORREO: entra como compañía, nunca como admin
+    const vitro = (await llamar('/api/perfiles', { cookie: admin, metodo: 'POST', cuerpo: { nombre: 'Vitro QA', config: {} } })).datos;
+    assert.strictEqual((await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: 'ana@vitro.com', perfilId: vitro.id } })).status, 400, 'la contraseña es obligatoria');
+    assert.strictEqual((await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: 'vitro', clave: 'clave-vitro-123', perfilId: vitro.id } })).status, 400, 'el usuario debe ser un correo');
+    const mismo = (await llamar('/api/usuarios', { cookie: admin, metodo: 'POST', cuerpo: { usuario: 'Jefe@Ejemplo.com', clave: 'clave-compania-123', perfilId: vitro.id } })).datos;
+    assert.strictEqual(mismo.usuario, 'jefe@ejemplo.com');
+    const cMismo = await entrar('jefe@ejemplo.com', 'clave-compania-123', 'jefe@ejemplo.com');
+    const est = (await llamar('/api/estado', { cookie: cMismo })).datos;
+    assert.strictEqual(est.usuario.rol, 'empresa');
+    assert.strictEqual(est.perfil.nombre, 'Vitro QA');
+    assert.strictEqual((await llamar('/api/usuarios', { cookie: cMismo })).status, 403);
 
-    // Usuario desactivado: no recibe código
-    await llamar(`/api/usuarios/${ana.id}`, { cookie: admin, metodo: 'PUT', cuerpo: { activo: false } });
-    const antes = bandejaLocal.length;
-    assert.strictEqual((await pedir('ana@vitro.com')).status, 200);
-    assert.strictEqual(bandejaLocal.length, antes);
-    assert.strictEqual((await llamar('/api/estado', { cookie: cAna.cookie })).status, 401);
+    // El código de una cuenta no sirve para la otra aunque compartan correo
+    const pAdmin = await paso1('jefe', 'clave-del-jefe-123');
+    const codigoDeAdmin = ultimoCodigo('jefe@ejemplo.com');
+    const pCompania = await paso1('jefe@ejemplo.com', 'clave-compania-123');
+    const codigoDeCompania = ultimoCodigo('jefe@ejemplo.com');
+    if (codigoDeAdmin !== codigoDeCompania) assert.strictEqual((await paso2(pCompania.pendiente, codigoDeAdmin)).status, 401);
+    const comoCompania = await paso2(pCompania.pendiente, codigoDeCompania);
+    assert.strictEqual((await llamar('/api/estado', { cookie: comoCompania.sesion })).datos.usuario.rol, 'empresa');
+    assert.strictEqual((await llamar('/api/estado', { cookie: (await paso2(pAdmin.pendiente, codigoDeAdmin)).sesion })).datos.usuario.rol, 'admin');
 
-    // Usuario antiguo (no es correo): sigue entrando con contraseña hasta que el admin le pone su correo
+    // Reenviar código: el anterior deja de servir
+    const p = await paso1('jefe@ejemplo.com', 'clave-compania-123');
+    const viejo = ultimoCodigo('jefe@ejemplo.com');
+    const re = await llamar('/api/login/reenviar', { metodo: 'POST', cookie: p.pendiente });
+    assert.strictEqual(re.status, 200);
+    const nuevo = ultimoCodigo('jefe@ejemplo.com');
+    if (viejo !== nuevo) assert.strictEqual((await paso2(p.pendiente, viejo)).status, 401);
+    assert.strictEqual((await paso2(p.pendiente, nuevo)).status, 200);
+
+    // Si desactivan al usuario entre el paso 1 y el 2, no entra
+    const p2 = await paso1('jefe@ejemplo.com', 'clave-compania-123');
+    await llamar(`/api/usuarios/${mismo.id}`, { cookie: admin, metodo: 'PUT', cuerpo: { activo: false } });
+    assert.strictEqual((await paso2(p2.pendiente, ultimoCodigo('jefe@ejemplo.com'))).status, 401);
+    await llamar(`/api/usuarios/${mismo.id}`, { cookie: admin, metodo: 'PUT', cuerpo: { activo: true } });
+
+    // 5 códigos equivocados anulan el código
+    const p3 = await paso1('jefe@ejemplo.com', 'clave-compania-123');
+    const bueno = ultimoCodigo('jefe@ejemplo.com');
+    const malo = bueno === '999999' ? '888888' : '999999';
+    for (let i = 0; i < 5; i++) assert.ok([401, 429].includes((await paso2(p3.pendiente, malo)).status));
+    assert.notStrictEqual((await paso2(p3.pendiente, bueno)).status, 200);
+
+    // Usuario antiguo (no es correo): sigue entrando solo con contraseña hasta que el admin le pone su correo
     const almacen = crearAlmacenArchivo(process.env.DATA_DIR);
     const viejoU = await almacen.usuarios.crear({ usuario: 'vitroqa', claveHash: hashClave('clave-vitroqa-123'), rol: 'empresa', perfilId: vitro.id });
-    const cViejo = (await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'vitroqa', clave: 'clave-vitroqa-123' } })).cookie;
-    assert.strictEqual((await llamar('/api/estado', { cookie: cViejo })).status, 200);
+    const directo = await paso1('vitroqa', 'clave-vitroqa-123');
+    assert.match(directo.sesion, /^ds_sesion=.+/);
+    assert.strictEqual(directo.datos.paso, undefined);
     assert.strictEqual((await llamar(`/api/usuarios/${viejoU.id}`, { cookie: admin, metodo: 'PUT', cuerpo: { usuario: 'no-es-correo' } })).status, 400);
-    const renombrado = await llamar(`/api/usuarios/${viejoU.id}`, { cookie: admin, metodo: 'PUT', cuerpo: { usuario: 'Compras@Vitro.com' } });
-    assert.strictEqual(renombrado.datos.usuario, 'compras@vitro.com');
-    assert.strictEqual((await llamar('/api/estado', { cookie: cViejo })).status, 401, 'cambiar el usuario cierra su sesión');
-    await pedir('compras@vitro.com');
-    assert.strictEqual((await verificar('compras@vitro.com', ultimoCodigo('compras@vitro.com'))).status, 200);
-    assert.strictEqual((await llamar('/api/login', { metodo: 'POST', cuerpo: { usuario: 'compras@vitro.com', clave: 'clave-vitroqa-123' } })).status, 200);
+    await llamar(`/api/usuarios/${viejoU.id}`, { cookie: admin, metodo: 'PUT', cuerpo: { usuario: 'Compras@Vitro.com' } });
+    assert.strictEqual((await llamar('/api/estado', { cookie: directo.sesion })).status, 401, 'cambiar el usuario cierra su sesión');
+    await entrar('compras@vitro.com', 'clave-vitroqa-123', 'compras@vitro.com');
 
-    // Límite de solicitudes de código por IP y correo
-    for (let i = 0; i < 5; i++) await pedir('limite@ejemplo.com');
-    assert.strictEqual((await pedir('limite@ejemplo.com')).status, 429);
+    // Límite de envíos de código por IP y cuenta
+    let ultimo;
+    for (let i = 0; i < 6; i++) ultimo = await paso1('compras@vitro.com', 'clave-vitroqa-123');
+    assert.strictEqual(ultimo.status, 429);
   } finally {
     s.close();
   }

@@ -5,6 +5,9 @@ const crypto = require('node:crypto');
 
 const DURACION_MS = 12 * 60 * 60 * 1000;
 const COOKIE = 'ds_sesion';
+// Segundo paso del inicio de sesión: contraseña correcta, falta el código del correo.
+const COOKIE_PENDIENTE = 'ds_2fa';
+const DURACION_PENDIENTE_MS = 10 * 60 * 1000;
 
 function hashClave(clave) {
   const sal = crypto.randomBytes(16);
@@ -27,15 +30,16 @@ function igualSeguro(a, b) {
   return crypto.timingSafeEqual(x, y);
 }
 
-function crearFirmador(secreto) {
+/** proposito separa las llaves: un token de un propósito nunca sirve para otro (p. ej. el pendiente no es sesión). */
+function crearFirmador(secreto, { proposito = 'sesion', duracionMs = DURACION_MS } = {}) {
   const llave = secreto
-    ? crypto.createHash('sha256').update(`sesion|${secreto}`).digest()
+    ? crypto.createHash('sha256').update(`${proposito}|${secreto}`).digest()
     : crypto.randomBytes(32);
   const firmar = (texto) => crypto.createHmac('sha256', llave).update(texto).digest('base64url');
   return {
     /** datos: { usuario, rol, perfilId } */
     emitir(datos) {
-      const cuerpo = Buffer.from(JSON.stringify({ ...datos, exp: Date.now() + DURACION_MS })).toString('base64url');
+      const cuerpo = Buffer.from(JSON.stringify({ ...datos, exp: Date.now() + duracionMs })).toString('base64url');
       return `${cuerpo}.${firmar(cuerpo)}`;
     },
     leer(token) {
@@ -72,11 +76,13 @@ function leerCookie(req, nombre) {
   return '';
 }
 
-function cookieSesion(token, { segura }) {
-  const atributos = ['Path=/', 'HttpOnly', 'SameSite=Strict', `Max-Age=${token ? DURACION_MS / 1000 : 0}`];
+function crearCookie(nombre, token, duracionMs, { segura }) {
+  const atributos = ['Path=/', 'HttpOnly', 'SameSite=Strict', `Max-Age=${token ? duracionMs / 1000 : 0}`];
   if (segura) atributos.push('Secure');
-  return `${COOKIE}=${encodeURIComponent(token)}; ${atributos.join('; ')}`;
+  return `${nombre}=${encodeURIComponent(token)}; ${atributos.join('; ')}`;
 }
+const cookieSesion = (token, opciones) => crearCookie(COOKIE, token, DURACION_MS, opciones);
+const cookiePendiente = (token, opciones) => crearCookie(COOKIE_PENDIENTE, token, DURACION_PENDIENTE_MS, opciones);
 
 // Frena ataques de fuerza bruta: 5 intentos fallidos por IP y usuario cada 15 minutos.
 const intentos = new Map();
@@ -92,4 +98,4 @@ function registrarFallo(clave) {
 }
 const limpiarFallos = (clave) => intentos.delete(clave);
 
-module.exports = { COOKIE, hashClave, verificarClave, igualSeguro, crearFirmador, generarCodigo, crearHasherCodigos, leerCookie, cookieSesion, bloqueado, registrarFallo, limpiarFallos };
+module.exports = { COOKIE, COOKIE_PENDIENTE, DURACION_PENDIENTE_MS, cookiePendiente, hashClave, verificarClave, igualSeguro, crearFirmador, generarCodigo, crearHasherCodigos, leerCookie, cookieSesion, bloqueado, registrarFallo, limpiarFallos };

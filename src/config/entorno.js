@@ -22,6 +22,7 @@ function leerEntorno(env = process.env) {
       dominioMailgun: env.MAILGUN_DOMINIO || '',
       regionMailgun: String(env.MAILGUN_REGION || 'us').toLowerCase(), // 'us' o 'eu', según la región de la cuenta
       remitente: env.CORREO_REMITENTE || '',
+      consola: env.CORREO_CONSOLA === '1', // solo local: el código se escribe en la consola en vez de enviarse
     },
   };
 }

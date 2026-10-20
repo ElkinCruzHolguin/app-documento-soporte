@@ -121,9 +121,9 @@
     <h3>Nuevo usuario</h3>
     <div class="rejilla">
       <div><label for="nuUsuario">Correo (es el usuario)</label><input id="nuUsuario" type="email" autocomplete="off" placeholder="nombre@empresa.com">
-        <div class="ayuda">Entra con un código de acceso que le llega a este correo.</div></div>
-      <div><label for="nuClave">Contraseña (opcional, mínimo 10 caracteres)</label><input id="nuClave" autocomplete="new-password">
-        <div class="ayuda">Solo como respaldo para entrar sin código. <a href="#" id="btnGenerar">Generar una segura</a> · después no se puede ver.</div></div>
+        <div class="ayuda">Entra con este correo y su contraseña; luego recibe aquí un código para terminar de entrar.</div></div>
+      <div><label for="nuClave">Contraseña (mínimo 10 caracteres)</label><input id="nuClave" autocomplete="new-password">
+        <div class="ayuda"><a href="#" id="btnGenerar">Generar una segura</a> · cópiala y entrégala a la compañía: después no se puede ver.</div></div>
       <div id="cajaPerfil"><label for="nuPerfil">Compañía</label><select id="nuPerfil"></select></div>
     </div>
     <div class="fila-botones"><button type="button" id="btnCrearUsuario">Crear usuario</button></div>
@@ -280,9 +280,7 @@ document.getElementById('btnCrearUsuario').onclick = async () => {
   };
   try {
     const u = await api('/api/usuarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
-    msgU(cuerpo.clave
-      ? `Usuario «${esc(u.usuario)}» creado. Entra con un código que le llega a su correo; como respaldo, usuario <b>${esc(u.usuario)}</b> y contraseña <b>${esc(cuerpo.clave)}</b> (no se volverá a mostrar).`
-      : `Usuario «${esc(u.usuario)}» creado. Entra con un código de acceso que le llega a ese correo.`);
+    msgU(`Usuario «${esc(u.usuario)}» creado. Entrégale estos datos: usuario <b>${esc(u.usuario)}</b>, contraseña <b>${esc(cuerpo.clave)}</b>. Al entrar recibirá un código en ese correo. La contraseña no se volverá a mostrar.`);
     document.getElementById('nuUsuario').value = '';
     document.getElementById('nuClave').value = '';
     await cargarUsuarios();

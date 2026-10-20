@@ -1,13 +1,13 @@
 'use strict';
 // Envío de correos. En producción usa la API de Mailgun (MAILGUN_API_KEY, MAILGUN_DOMINIO, CORREO_REMITENTE)
 // o la de Resend (RESEND_API_KEY, CORREO_REMITENTE).
-// En local, sin esas variables, no envía nada: escribe el correo en la consola y lo deja en `bandejaLocal`
-// (lo usan las pruebas). En Vercel, sin esas variables, el envío no está disponible.
+// En local, con CORREO_CONSOLA=1, no envía nada: escribe el correo en la consola y lo deja en `bandejaLocal`
+// (lo usan las pruebas). Sin nada de eso, el envío no está disponible y se entra solo con contraseña.
 
 const bandejaLocal = [];
 
 function crearEnviadorCorreo({ correo = {}, enVercel = false } = {}, { fetch: fetchFn = globalThis.fetch } = {}) {
-  const { llaveResend, llaveMailgun, dominioMailgun, regionMailgun, remitente } = correo;
+  const { llaveResend, llaveMailgun, dominioMailgun, regionMailgun, remitente, consola } = correo;
 
   if (llaveMailgun && dominioMailgun && remitente) {
     const base = regionMailgun === 'eu' ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net';
@@ -46,7 +46,7 @@ function crearEnviadorCorreo({ correo = {}, enVercel = false } = {}, { fetch: fe
     };
   }
 
-  if (enVercel) return { disponible: false, async enviar() { throw new Error('El envío de correos no está configurado.'); } };
+  if (enVercel || !consola) return { disponible: false, async enviar() { throw new Error('El envío de correos no está configurado.'); } };
 
   return {
     disponible: true,

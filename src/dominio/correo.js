@@ -19,4 +19,11 @@ function mensajeCodigo(codigo) {
   };
 }
 
-module.exports = { esCorreo, normalizarCorreo, OTP, mensajeCodigo };
+/** Correo para mostrar sin revelarlo completo: e***z@jtc.com.co */
+function enmascararCorreo(correo) {
+  const [usuario, dominio] = String(correo).split('@');
+  if (!dominio) return '';
+  return `${usuario[0]}***${usuario.length > 1 ? usuario.slice(-1) : ''}@${dominio}`;
+}
+
+module.exports = { esCorreo, normalizarCorreo, OTP, mensajeCodigo, enmascararCorreo };

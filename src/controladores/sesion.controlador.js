@@ -1,30 +1,34 @@
 'use strict';
-// Inicio de sesión (contraseña o código al correo), cierre y estado del usuario conectado.
+// Inicio de sesión (contraseña y luego código al correo), cierre y estado del usuario conectado.
 const seguridad = require('../infraestructura/seguridad');
 
 function crearControladorSesion({ autenticacion, companias }, { cookieSegura }) {
   return {
     async iniciar(req, res) {
       const { usuario, clave } = req.body || {};
-      const { token, rol } = await autenticacion.iniciarSesion({ usuario, clave, ip: req.ip });
-      if (token) res.set('Set-Cookie', seguridad.cookieSesion(token, { segura: cookieSegura }));
-      res.json({ ok: true, rol });
-    },
-
-    opciones(req, res) {
-      res.json(autenticacion.opciones());
-    },
-
-    async solicitarCodigo(req, res) {
-      const { correo } = req.body || {};
-      res.json({ ok: true, ...(await autenticacion.solicitarCodigo({ correo, ip: req.ip })) });
+      const r = await autenticacion.iniciarSesion({ usuario, clave, ip: req.ip });
+      if (r.pendiente) {
+        // Contraseña correcta: falta el código que se envió al correo.
+        res.set('Set-Cookie', seguridad.cookiePendiente(r.pendiente, { segura: cookieSegura }));
+        return res.json({ ok: true, paso: 'codigo', destino: r.destino });
+      }
+      if (r.token) res.set('Set-Cookie', seguridad.cookieSesion(r.token, { segura: cookieSegura }));
+      res.json({ ok: true, rol: r.rol });
     },
 
     async verificarCodigo(req, res) {
-      const { correo, codigo } = req.body || {};
-      const { token, rol } = await autenticacion.verificarCodigo({ correo, codigo, ip: req.ip });
-      res.set('Set-Cookie', seguridad.cookieSesion(token, { segura: cookieSegura }));
+      const pendiente = seguridad.leerCookie(req, seguridad.COOKIE_PENDIENTE);
+      const { token, rol } = await autenticacion.verificarCodigo({ pendiente, codigo: (req.body || {}).codigo, ip: req.ip });
+      res.set('Set-Cookie', [
+        seguridad.cookieSesion(token, { segura: cookieSegura }),
+        seguridad.cookiePendiente('', { segura: cookieSegura }),
+      ]);
       res.json({ ok: true, rol });
+    },
+
+    async reenviarCodigo(req, res) {
+      const pendiente = seguridad.leerCookie(req, seguridad.COOKIE_PENDIENTE);
+      res.json({ ok: true, ...(await autenticacion.reenviarCodigo({ pendiente, ip: req.ip })) });
     },
 
     cerrar(req, res) {

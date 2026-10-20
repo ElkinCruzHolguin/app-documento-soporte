@@ -1,8 +1,7 @@
 'use strict';
 // Usuarios de las compañías. Solo el administrador los gestiona. Los usuarios creados aquí
 // son siempre de compañía: el único administrador es APP_USUARIO.
-// El usuario es el correo: con él se recibe el código de acceso. La contraseña es opcional (respaldo).
-const crypto = require('node:crypto');
+// El usuario es el correo: entra con él y su contraseña, y ahí recibe el código del segundo paso.
 const { fallo } = require('../dominio/errores');
 const { esCorreo, normalizarCorreo } = require('../dominio/correo');
 
@@ -21,8 +20,7 @@ function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
   }
   function validarCorreo(correo) {
     if (!esCorreo(correo)) throw fallo(400, 'El usuario debe ser un correo válido (p. ej. nombre@empresa.com).');
-    const reservados = [entorno.usuarioAdmin, entorno.correoAdmin].filter(Boolean).map((x) => x.toLowerCase());
-    if (reservados.includes(correo)) throw fallo(400, 'Ese nombre está reservado para el super administrador.');
+    if (entorno.usuarioAdmin && correo === entorno.usuarioAdmin.toLowerCase()) throw fallo(400, 'Ese nombre está reservado para el super administrador.');
   }
   async function existente(id) {
     const u = await usuarios.obtener(id);
@@ -36,16 +34,13 @@ function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
       return usuarios.listar();
     },
 
-    /** Sin contraseña, el usuario entra solo con el código que le llega al correo. */
     async crear(actor, { usuario, clave, rol = 'empresa', perfilId }) {
       exigirAdmin(actor);
       const nombre = normalizarCorreo(usuario);
       validarCorreo(nombre);
-      if (clave) validarClave(clave);
+      validarClave(clave);
       await validarRolYCompania(rol, Number(perfilId));
-      // Sin contraseña se guarda el hash de una aleatoria que nadie conoce: así no se puede entrar con clave.
-      const claveHash = seguridad.hashClave(clave || crypto.randomBytes(32).toString('base64url'));
-      return usuarios.crear({ usuario: nombre, claveHash, rol, perfilId: Number(perfilId) });
+      return usuarios.crear({ usuario: nombre, claveHash: seguridad.hashClave(clave), rol, perfilId: Number(perfilId) });
     },
 
     async actualizar(actor, id, datos) {

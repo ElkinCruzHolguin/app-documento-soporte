@@ -20,40 +20,33 @@
 <main>
   <section class="panel login">
     <h1>Documentos soporte · Saphety</h1>
-    <p class="ayuda" id="ayuda">Ingresa con el usuario y la contraseña de tu compañía.</p>
+    <p class="ayuda" id="ayuda">Ingresa con tu usuario (correo) y contraseña.</p>
     <div id="msg"></div>
 
-    <!-- Código al correo (OTP): paso 1, el correo; paso 2, el código -->
-    <form id="formCorreo" hidden>
-      <div><label for="correo">Correo</label><input id="correo" name="correo" type="email" autocomplete="email" required></div>
-      <button type="submit" id="btnCorreo">Enviarme un código</button>
+    <!-- Paso 1: usuario y contraseña -->
+    <form id="form">
+      <div><label for="usuario">Usuario (correo)</label><input id="usuario" name="usuario" autocomplete="username" required autofocus></div>
+      <div><label for="clave">Contraseña</label><input id="clave" name="clave" type="password" autocomplete="current-password" required></div>
+      <button type="submit" id="btn">Continuar</button>
     </form>
+
+    <!-- Paso 2: código de un solo uso enviado al correo -->
     <form id="formCodigo" hidden>
       <div><label for="codigo">Código de 6 dígitos</label><input id="codigo" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required></div>
       <button type="submit" id="btnCodigo">Ingresar</button>
-      <p class="alterno"><a href="#" id="btnReenviar">Reenviar código</a> · <a href="#" id="btnOtroCorreo">Usar otro correo</a></p>
+      <p class="alterno"><a href="#" id="btnReenviar">Reenviar código</a> · <a href="#" id="btnVolver">Volver</a></p>
     </form>
-
-    <!-- Usuario y contraseña (respaldo) -->
-    <form id="form">
-      <div><label for="usuario">Usuario</label><input id="usuario" name="usuario" autocomplete="username" required autofocus></div>
-      <div><label for="clave">Contraseña</label><input id="clave" name="clave" type="password" autocomplete="current-password" required></div>
-      <button type="submit" id="btn">Ingresar</button>
-    </form>
-
-    <p class="alterno" id="cambiarModo" hidden><a href="#" id="btnModo"></a></p>
   </section>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
 const form = $('form');
-const formCorreo = $('formCorreo');
 const formCodigo = $('formCodigo');
 const msg = $('msg');
 const aviso = (texto, tipo) => { msg.innerHTML = texto ? `<div class="aviso ${tipo}"></div>` : ''; if (texto) msg.firstChild.textContent = texto; };
 
 async function post(ruta, cuerpo) {
-  const r = await fetch(ruta, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+  const r = await fetch(ruta, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo || {}) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
   return d;
@@ -63,38 +56,32 @@ async function ocupado(boton, fn) {
   aviso('');
   try { await fn(); } catch (e) { aviso(e.message, 'err'); } finally { boton.disabled = false; }
 }
-
-// Modos: 'codigo' (correo + código) o 'clave' (usuario + contraseña).
-let modo = 'clave';
-let hayCodigo = false;
-function mostrar(nuevo, paso = 'correo') {
-  modo = nuevo;
-  aviso('');
-  form.hidden = modo !== 'clave';
-  formCorreo.hidden = modo !== 'codigo' || paso !== 'correo';
-  formCodigo.hidden = modo !== 'codigo' || paso !== 'codigo';
-  $('ayuda').textContent = modo === 'clave'
-    ? 'Ingresa con el usuario y la contraseña de tu compañía.'
-    : paso === 'correo' ? 'Escribe tu correo y te enviaremos un código de acceso de un solo uso.' : `Escribe el código que enviamos a ${formCorreo.correo.value.trim()}. Vence en 10 minutos.`;
-  $('cambiarModo').hidden = !hayCodigo;
-  $('btnModo').textContent = modo === 'clave' ? 'Entrar con un código al correo' : 'Entrar con usuario y contraseña';
-  (modo === 'clave' ? form.usuario : paso === 'correo' ? formCorreo.correo : formCodigo.codigo).focus();
+function paso(n, destino) {
+  form.hidden = n !== 1;
+  formCodigo.hidden = n !== 2;
+  $('ayuda').textContent = n === 1
+    ? 'Ingresa con tu usuario (correo) y contraseña.'
+    : `Te enviamos un código a ${destino}. Escríbelo para terminar de entrar; vence en 10 minutos. Revisa también la carpeta de spam.`;
+  (n === 1 ? form.clave : formCodigo.codigo).focus();
 }
-$('btnModo').onclick = (ev) => { ev.preventDefault(); mostrar(modo === 'clave' ? 'codigo' : 'clave'); };
 
-async function pedirCodigo() {
-  const d = await post('/api/login/codigo', { correo: formCorreo.correo.value });
-  mostrar('codigo', 'codigo');
-  aviso(d.mensaje, 'ok');
-}
-formCorreo.onsubmit = (ev) => { ev.preventDefault(); ocupado($('btnCorreo'), pedirCodigo); };
-$('btnReenviar').onclick = (ev) => { ev.preventDefault(); formCodigo.codigo.value = ''; ocupado($('btnCodigo'), pedirCodigo); };
-$('btnOtroCorreo').onclick = (ev) => { ev.preventDefault(); formCodigo.codigo.value = ''; mostrar('codigo', 'correo'); };
+form.onsubmit = (ev) => {
+  ev.preventDefault();
+  ocupado($('btn'), async () => {
+    try {
+      const d = await post('/api/login', { usuario: form.usuario.value, clave: form.clave.value });
+      if (d.paso === 'codigo') return paso(2, d.destino);
+      location.href = 'index.html';
+    } finally {
+      form.clave.value = '';
+    }
+  });
+};
 formCodigo.onsubmit = (ev) => {
   ev.preventDefault();
   ocupado($('btnCodigo'), async () => {
     try {
-      await post('/api/login/verificar', { correo: formCorreo.correo.value, codigo: formCodigo.codigo.value });
+      await post('/api/login/verificar', { codigo: formCodigo.codigo.value });
       location.href = 'index.html';
     } catch (e) {
       formCodigo.codigo.value = '';
@@ -103,26 +90,14 @@ formCodigo.onsubmit = (ev) => {
     }
   });
 };
-
-form.onsubmit = (ev) => {
+$('btnReenviar').onclick = (ev) => {
   ev.preventDefault();
-  ocupado($('btn'), async () => {
-    try {
-      await post('/api/login', { usuario: form.usuario.value, clave: form.clave.value });
-      location.href = 'index.html';
-    } catch (e) {
-      form.clave.value = '';
-      form.clave.focus();
-      throw e;
-    }
+  ocupado($('btnCodigo'), async () => {
+    const d = await post('/api/login/reenviar');
+    aviso(`Te enviamos un código nuevo a ${d.destino}.`, 'ok');
   });
 };
-
-// Si el servidor tiene configurado el envío de correos, se entra por defecto con código.
-fetch('/api/login/opciones').then((r) => (r.ok ? r.json() : {})).then((o) => {
-  hayCodigo = !!o.codigo;
-  if (hayCodigo) mostrar('codigo');
-}).catch(() => {});
+$('btnVolver').onclick = (ev) => { ev.preventDefault(); formCodigo.codigo.value = ''; aviso(''); paso(1); };
 </script>
 </body>
 </html>

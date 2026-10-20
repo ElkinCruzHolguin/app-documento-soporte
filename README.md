@@ -27,12 +27,13 @@ Las variables están documentadas en `.env.example`. Copia ese archivo como `.en
 La contraseña de Saphety se escribe en Administración, se guarda cifrada (AES-256-GCM) con `APP_SECRETO` y nunca vuelve al navegador.
 
 ## Usuarios y acceso
-- Se entra por `login.html`; la sesión (cookie firmada, HttpOnly) dura 12 horas. Hay dos formas:
-  - **Código al correo (OTP)**, la forma principal: el usuario escribe su correo, recibe un código de 6 dígitos que vence en 10 minutos, sirve una sola vez y admite 5 intentos. Solo se guarda el hash del código (tabla `codigos_acceso`). Necesita Mailgun (`MAILGUN_API_KEY`, `MAILGUN_DOMINIO`) o Resend (`RESEND_API_KEY`), más `CORREO_REMITENTE`; sin ellas la pantalla solo ofrece contraseña.
-  - **Usuario y contraseña**, como respaldo (por ejemplo, si el correo falla).
-- **Super administrador**: `APP_USUARIO`/`APP_CLAVE`, o código a `APP_CORREO`. Ve todo y es el único que crea o modifica compañías y usuarios.
+- Se entra por `login.html` en dos pasos; la sesión (cookie firmada, HttpOnly) dura 12 horas:
+  1. Usuario (correo) y contraseña. Si son correctos, el servidor todavía no emite la sesión: deja un estado «pendiente» de 10 minutos (cookie firmada aparte, que no sirve como sesión).
+  2. Envía un código de 6 dígitos al correo de la cuenta (vence en 10 minutos, sirve una vez, 5 intentos) y solo al validarlo emite la sesión. Solo se guarda el hash del código (tabla `codigos_acceso`).
+  - El envío usa Mailgun (`MAILGUN_API_KEY`, `MAILGUN_DOMINIO`) o Resend (`RESEND_API_KEY`), más `CORREO_REMITENTE`. Sin ellas se entra solo con contraseña, como antes.
+- **Super administrador**: `APP_USUARIO`/`APP_CLAVE`; su código llega a `APP_CORREO`. Ve todo y es el único que crea o modifica compañías y usuarios. Un usuario de compañía con el mismo correo sigue siendo solo de compañía: el rol sale de la cuenta con la que se entra, nunca del correo.
 - **Compañías**: solo el super administrador las crea y modifica (Administración › «Nueva compañía»). Cada una tiene su conexión con Saphety, sus parámetros, sus usuarios y su historial.
-- **Usuarios de compañía**: se crean en Administración › Usuarios, cada uno ligado a una compañía. **El usuario es su correo** y la contraseña es opcional. Los usuarios antiguos que no son correo siguen entrando con contraseña hasta que el administrador les pone su correo («Cambiar correo»). Solo cargan y envían con su compañía, solo ven su historial y ven la configuración de su compañía en solo lectura («Mi compañía»). El servidor lo exige en cada petición; desactivar un usuario o cambiarle el perfil cierra su sesión al instante.
+- **Usuarios de compañía**: se crean en Administración › Usuarios, cada uno ligado a una compañía. **El usuario es su correo.** Los usuarios antiguos que no son correo siguen entrando solo con contraseña (sin código) hasta que el administrador les pone su correo («Cambiar correo»). Solo cargan y envían con su compañía, solo ven su historial y ven la configuración de su compañía en solo lectura («Mi compañía»). El servidor lo exige en cada petición; desactivar un usuario o cambiarle el perfil cierra su sesión al instante.
 - Las contraseñas se guardan con scrypt y no se pueden recuperar: si se olvida, el administrador asigna una nueva. 5 intentos fallidos bloquean ese usuario 15 minutos.
 - En local, sin `APP_USUARIO`/`APP_CLAVE`, no se pide inicio de sesión.
 
