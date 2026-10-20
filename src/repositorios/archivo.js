@@ -92,10 +92,10 @@ function crearAlmacenArchivo(dir) {
       guardarJson(ARCHIVO_ENVIOS, lista);
       return id;
     },
-    /** Envíos reales previos de esos números del Excel para ese NIT (ver resumirPrevios). */
-    previos: async (nit, numerosExcel) => {
+    /** Envíos reales previos de esos números del Excel en esa compañía (ver resumirPrevios). */
+    previos: async (perfilId, numerosExcel) => {
       const buscados = new Set(numerosExcel);
-      return resumirPrevios(leerEnvios().filter((e) => e.modo === 'real' && e.nitAdquiriente === nit), buscados);
+      return resumirPrevios(leerEnvios().filter((e) => e.modo === 'real' && e.perfilId === Number(perfilId)), buscados);
     },
     listar: async ({ buscar = '', limite = 100, perfilId = null } = {}) => {
       const q = buscar.toUpperCase();

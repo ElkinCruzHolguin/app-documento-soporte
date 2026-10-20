@@ -78,13 +78,13 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
       nit_adquiriente: r.nitAdquiriente, proveedor: r.proveedor, identificacion: r.identificacion, valor: r.valor,
       saphety_id: r.saphetyId, cuds: r.cuds, mensaje: r.mensaje, documento: r.documento, respuesta: r.respuesta,
     }).select('id').single()).id,
-    previos: async (nit, numerosExcel) => {
+    previos: async (perfilId, numerosExcel) => {
       const filas = new Map(); // id -> fila (una fila puede salir por numero_excel y por numero)
       for (let i = 0; i < numerosExcel.length; i += 200) {
         const lote = numerosExcel.slice(i, i + 200);
         for (const columna of ['numero_excel', 'numero']) {
           const r = revisar(await db.from('envios').select('id, numero, numero_excel, estado')
-            .eq('modo', 'real').eq('nit_adquiriente', nit).in(columna, lote));
+            .eq('modo', 'real').eq('perfil_id', Number(perfilId)).in(columna, lote));
           for (const f of r) filas.set(f.id, { id: f.id, numero: f.numero, numeroExcel: f.numero_excel, estado: f.estado });
         }
       }
