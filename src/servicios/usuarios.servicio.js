@@ -6,6 +6,7 @@
 const { fallo } = require('../dominio/errores');
 const { esCorreo, normalizarCorreo } = require('../dominio/correo');
 const { limpiarModulos } = require('../dominio/modulos');
+const { limpiarCompanias } = require('../dominio/accesos');
 
 const ROLES = ['empresa', 'admin'];
 
@@ -19,6 +20,13 @@ function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
     if (rol === 'admin') return null;
     if (!(await perfiles.obtener(perfilId))) throw fallo(400, 'Elige la compañía del usuario.');
     return perfilId;
+  }
+  /** Compañías ligadas (además de la principal): deben existir. Un administrador no tiene. */
+  async function validarLigadas(lista, rol, principal) {
+    if (rol === 'admin') return [];
+    const ids = limpiarCompanias(lista, fallo).filter((id) => id !== principal);
+    for (const id of ids) if (!(await perfiles.obtener(id))) throw fallo(400, 'Una de las compañías ligadas no existe.');
+    return ids;
   }
   /** Un administrador no puede quitarse a sí mismo el rol, desactivarse ni eliminarse. */
   const exigirOtro = (actor, id, que) => {
@@ -44,13 +52,15 @@ function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
     },
 
     /** modulos: lista de módulos que ve el usuario; null = todos los de su compañía. */
-    async crear(actor, { usuario, clave, rol = 'empresa', perfilId, modulos = null }) {
+    /** companias: otras compañías a las que el usuario puede cambiarse (p. ej. QA y producción). */
+    async crear(actor, { usuario, clave, rol = 'empresa', perfilId, modulos = null, companias = [] }) {
       exigirAdmin(actor);
       const nombre = normalizarCorreo(usuario);
       validarCorreo(nombre);
       validarClave(clave);
       const compania = await validarRolYCompania(rol, Number(perfilId));
-      return usuarios.crear({ usuario: nombre, claveHash: seguridad.hashClave(clave), rol, perfilId: compania, modulos: rol === 'admin' ? null : limpiarModulos(modulos, fallo) });
+      const ligadas = await validarLigadas(companias, rol, compania);
+      return usuarios.crear({ usuario: nombre, claveHash: seguridad.hashClave(clave), rol, perfilId: compania, modulos: rol === 'admin' ? null : limpiarModulos(modulos, fallo), companias: ligadas });
     },
 
     async actualizar(actor, id, datos) {
@@ -77,7 +87,12 @@ function crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }) {
         // Al pasar de administrador a compañía hay que elegir la compañía.
         const perfilId = await validarRolYCompania(rol, Number(datos.perfilId ?? actual.perfilId));
         Object.assign(cambios, { rol, perfilId });
-        if (rol === 'admin') cambios.modulos = null;
+        if (rol === 'admin') Object.assign(cambios, { modulos: null, companias: [] });
+      }
+      if ('companias' in datos || ('perfilId' in cambios && cambios.rol !== 'admin')) {
+        const rol = cambios.rol || actual.rol;
+        const principal = 'perfilId' in cambios ? cambios.perfilId : actual.perfilId;
+        cambios.companias = await validarLigadas('companias' in datos ? datos.companias : actual.companias, rol, principal);
       }
       return usuarios.actualizar(actual.id, cambios);
     },

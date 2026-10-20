@@ -103,7 +103,7 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
   };
 
   const aUsuario = (f) => f && ({
-    id: f.id, usuario: f.usuario, claveHash: f.clave_hash, rol: f.rol, perfilId: f.perfil_id, modulos: f.modulos ?? null, activo: f.activo,
+    id: f.id, usuario: f.usuario, claveHash: f.clave_hash, rol: f.rol, perfilId: f.perfil_id, modulos: f.modulos ?? null, companias: f.companias ?? [], activo: f.activo,
     creadoEn: f.creado_en, ultimoIngreso: f.ultimo_ingreso,
   });
   const usuarios = {
@@ -111,8 +111,8 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
     obtener: async (id) => usuarioPublico(aUsuario(revisar(await db.from('usuarios').select('*').eq('id', Number(id)).maybeSingle()))),
     /** Incluye claveHash: solo para el inicio de sesión. */
     porNombre: async (usuario) => aUsuario(revisar(await db.from('usuarios').select('*').eq('usuario', usuario).maybeSingle())),
-    crear: async ({ usuario, claveHash, rol, perfilId, modulos = null }) => usuarioPublico(aUsuario(revisar(await db.from('usuarios')
-      .insert({ usuario, clave_hash: claveHash, rol, perfil_id: perfilId ?? null, modulos }).select('*').single()))),
+    crear: async ({ usuario, claveHash, rol, perfilId, modulos = null, companias = [] }) => usuarioPublico(aUsuario(revisar(await db.from('usuarios')
+      .insert({ usuario, clave_hash: claveHash, rol, perfil_id: perfilId ?? null, modulos, companias }).select('*').single()))),
     actualizar: async (id, c) => {
       const cambios = {};
       if ('usuario' in c) cambios.usuario = c.usuario;
@@ -121,6 +121,7 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
       if ('perfilId' in c) cambios.perfil_id = c.perfilId;
       if ('activo' in c) cambios.activo = c.activo;
       if ('modulos' in c) cambios.modulos = c.modulos;
+      if ('companias' in c) cambios.companias = c.companias;
       if ('ultimoIngreso' in c) cambios.ultimo_ingreso = c.ultimoIngreso;
       return usuarioPublico(aUsuario(revisar(await db.from('usuarios').update(cambios).eq('id', Number(id)).select('*').single())));
     },

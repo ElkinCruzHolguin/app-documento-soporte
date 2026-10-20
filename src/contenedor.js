@@ -29,7 +29,7 @@ function crearContenedor(entorno) {
   const codigos = perezoso('codigos');
   const correo = crearEnviadorCorreo(entorno);
 
-  const companias = crearServicioCompanias({ perfiles, saphety });
+  const companias = crearServicioCompanias({ perfiles, usuarios, saphety });
   const servicios = {
     autenticacion: crearServicioAutenticacion({ entorno, usuarios, codigos, correo, seguridad }),
     companias,

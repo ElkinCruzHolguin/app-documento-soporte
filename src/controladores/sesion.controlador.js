@@ -6,7 +6,8 @@ function crearControladorSesion({ autenticacion, companias, modulos }, { cookieS
   return {
     async iniciar(req, res) {
       const { usuario, clave } = req.body || {};
-      const r = await autenticacion.iniciarSesion({ usuario, clave, ip: req.ip });
+      const equipo = seguridad.leerCookie(req, seguridad.COOKIE_CONFIANZA);
+      const r = await autenticacion.iniciarSesion({ usuario, clave, ip: req.ip, equipo });
       if (r.pendiente) {
         // Contraseña correcta: falta el código que se envió al correo.
         res.set('Set-Cookie', seguridad.cookiePendiente(r.pendiente, { segura: cookieSegura }));
@@ -18,10 +19,12 @@ function crearControladorSesion({ autenticacion, companias, modulos }, { cookieS
 
     async verificarCodigo(req, res) {
       const pendiente = seguridad.leerCookie(req, seguridad.COOKIE_PENDIENTE);
-      const { token, rol } = await autenticacion.verificarCodigo({ pendiente, codigo: (req.body || {}).codigo, ip: req.ip });
+      const { codigo, recordar } = req.body || {};
+      const { token, rol, equipo } = await autenticacion.verificarCodigo({ pendiente, codigo, ip: req.ip, recordar: !!recordar });
       res.set('Set-Cookie', [
         seguridad.cookieSesion(token, { segura: cookieSegura }),
         seguridad.cookiePendiente('', { segura: cookieSegura }),
+        ...(equipo ? [seguridad.cookieConfianza(equipo, { segura: cookieSegura })] : []),
       ]);
       res.json({ ok: true, rol });
     },
@@ -40,10 +43,16 @@ function crearControladorSesion({ autenticacion, companias, modulos }, { cookieS
       res.json(modulos.catalogo());
     },
 
+    /** El usuario de compañía cambia de compañía (p. ej. de QA a producción). */
+    async cambiarCompania(req, res) {
+      const { token } = await autenticacion.cambiarCompania(req.usuario, (req.body || {}).perfilId);
+      res.set('Set-Cookie', seguridad.cookieSesion(token, { segura: cookieSegura })).json({ ok: true });
+    },
+
     async estado(req, res) {
-      const [p, mods] = await Promise.all([companias.deActor(req.usuario), modulos.deActor(req.usuario)]);
+      const [p, mods, otras] = await Promise.all([companias.deActor(req.usuario), modulos.deActor(req.usuario), companias.disponibles(req.usuario)]);
       res.json({
-        usuario: { usuario: req.usuario.usuario, rol: req.usuario.rol, login: autenticacion.activa, modulos: mods, cambiaClave: !!req.usuario.id },
+        usuario: { usuario: req.usuario.usuario, rol: req.usuario.rol, login: autenticacion.activa, modulos: mods, cambiaClave: !!req.usuario.id, companias: otras },
         perfil: p && { id: p.id, nombre: p.nombre, modoEnvio: p.config.modoEnvio, url: p.config.url, numeracion: p.config.numeracion },
       });
     },

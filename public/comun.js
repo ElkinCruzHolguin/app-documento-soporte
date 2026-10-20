@@ -16,10 +16,21 @@ const MODULO_DE_PAGINA = { 'documento.html': 'emitidos', 'recibido.html': 'recib
 const paginaActual = () => location.pathname.split('/').pop() || 'index.html';
 const moduloDePagina = (pagina) => (MENU.find((m) => m.href === pagina) || {}).modulo || MODULO_DE_PAGINA[pagina];
 
-/** Oculta del menú lo que el usuario no tiene y lo saca de una página que no puede ver. */
-function aplicarModulos(modulos) {
-  if (!Array.isArray(modulos)) return;
+// Lo que puede ver el usuario se guarda en la pestaña para pintar el menú ya filtrado al cargar cada
+// página. Sin esto se alcanzan a ver un instante los módulos ocultos (el servidor igual los bloquea).
+const LLAVE_MENU = 'ds_menu';
+const leerMenu = () => { try { return JSON.parse(sessionStorage.getItem(LLAVE_MENU)); } catch { return null; } };
+const guardarMenu = (v) => { try { if (v) sessionStorage.setItem(LLAVE_MENU, JSON.stringify(v)); else sessionStorage.removeItem(LLAVE_MENU); } catch { /* sin almacenamiento */ } };
+
+/** Muestra en el menú solo los módulos del usuario y lo saca de una página que no puede ver. */
+function aplicarModulos(modulos, esAdmin) {
+  const nav = document.getElementById('menu');
+  if (!Array.isArray(modulos)) { if (nav) nav.classList.remove('cargando'); return; }
+  guardarMenu({ modulos, esAdmin });
   document.querySelectorAll('#menu a[data-modulo]').forEach((a) => { a.hidden = !modulos.includes(a.dataset.modulo); });
+  // Un usuario de compañía ve la configuración de la suya en solo lectura (el servidor impide modificarla).
+  if (!esAdmin) document.querySelectorAll('[data-enlace-admin]').forEach((a) => { a.textContent = 'Mi compañía'; });
+  if (nav) nav.classList.remove('cargando');
   const modulo = moduloDePagina(paginaActual());
   if (modulo && !modulos.includes(modulo)) {
     const destino = MENU.find((m) => modulos.includes(m.modulo));
@@ -31,13 +42,19 @@ function pintarMenu() {
   const nav = document.getElementById('menu');
   if (!nav) return;
   const activo = nav.dataset.activo || paginaActual();
-  nav.innerHTML = MENU.map((m) => `<a href="${m.href}" data-modulo="${m.modulo}"${m.href === activo ? ' class="activo"' : ''}${m.admin ? ' data-enlace-admin' : ''}>${m.texto}</a>`).join('');
+  const previo = leerMenu();
+  const visible = (m) => !previo || previo.modulos.includes(m.modulo);
+  const texto = (m) => (m.admin && previo && !previo.esAdmin ? 'Mi compañía' : m.texto);
+  nav.innerHTML = MENU.map((m) => `<a href="${m.href}" data-modulo="${m.modulo}"${m.href === activo ? ' class="activo"' : ''}${m.admin ? ' data-enlace-admin' : ''}${visible(m) ? '' : ' hidden'}>${texto(m)}</a>`).join('');
+  // Primera página de la sesión: el menú espera a saber qué módulos tiene el usuario.
+  if (!previo) nav.classList.add('cargando');
 }
 document.addEventListener('DOMContentLoaded', pintarMenu);
 async function api(ruta, opciones = {}) {
   const resp = await fetch(ruta, opciones);
   if (resp.status === 401) {
     // Sin sesión o sesión vencida: a la pantalla de inicio de sesión.
+    guardarMenu(null);
     location.href = 'login.html';
     throw new Error('Inicia sesión.');
   }
@@ -59,6 +76,7 @@ const chip = (estado) => `<span class="chip ${esc(estado)}">${esc(ETIQUETAS_ESTA
 const pesos = (n) => (n == null ? '' : Number(n).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
 async function salir() {
+  guardarMenu(null);
   await fetch('/api/logout', { method: 'POST' });
   location.href = 'login.html';
 }
@@ -69,15 +87,30 @@ async function pintarBanner() {
   try {
     const { perfil, usuario } = await api('/api/estado');
     const esAdmin = usuario.rol === 'admin';
-    aplicarModulos(usuario.modulos);
-    // Un usuario de compañía ve la configuración de la suya en solo lectura (el servidor impide modificarla).
-    if (!esAdmin) document.querySelectorAll('[data-enlace-admin]').forEach((a) => { a.textContent = 'Mi compañía'; });
+    aplicarModulos(usuario.modulos, esAdmin);
     const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>'
       : perfil.modoEnvio === 'real' ? '<span class="chip real">ENVÍO REAL</span>' : '<span class="chip simulado">Modo simulado</span>';
+    // Usuario ligado a varias compañías (p. ej. QA y producción): elige con cuál trabajar.
+    const otras = usuario.companias || [];
+    const compania = otras.length > 1
+      ? `<select id="selCompania" class="selector-compania" aria-label="Cambiar de compañía">${otras.map((c) => `<option value="${c.id}" ${perfil && c.id === perfil.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>`
+      : perfil ? `<div class="banner-nombre">${esc(perfil.nombre)}</div>` : '';
     const quien = usuario.login
-      ? ` · <b>${esc(usuario.usuario)}</b>${esAdmin ? ' (admin)' : ''}${usuario.cambiaClave ? ' · <a href="cuenta.html">Cambiar contraseña</a>' : ''} · <a href="#" id="btnSalir">Salir</a>`
+      ? `<div class="banner-usuario" title="${esc(usuario.usuario)}">${esc(usuario.usuario)}${esAdmin ? ' (admin)' : ''}</div>
+         <div class="banner-enlaces">${usuario.cambiaClave ? '<a href="cuenta.html">Cambiar contraseña</a> · ' : ''}<a href="#" id="btnSalir">Salir</a></div>`
       : '';
-    el.innerHTML = `${perfil ? `Compañía <b>${esc(perfil.nombre)}</b> · ` : ''}${modo}${quien}`;
+    el.innerHTML = `<div class="banner-compania"><span class="banner-etiqueta">Compañía</span>${compania}<div>${modo}</div></div>${quien}`;
+    const sel = document.getElementById('selCompania');
+    if (sel) {
+      sel.onchange = async () => {
+        sel.disabled = true;
+        try {
+          await api('/api/sesion/compania', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ perfilId: Number(sel.value) }) });
+          guardarMenu(null); // la otra compañía puede tener otros módulos
+          location.reload();
+        } catch (e) { sel.disabled = false; alert(e.message); }
+      };
+    }
     const btn = document.getElementById('btnSalir');
     if (btn) btn.onclick = (ev) => { ev.preventDefault(); salir(); };
   } catch (e) {

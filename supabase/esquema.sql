@@ -55,6 +55,8 @@ create index if not exists envios_perfil on public.envios (perfil_id, id desc);
 -- Módulos que ve el usuario (lista de claves, ver src/dominio/modulos.js). null = todos los de su compañía.
 -- Los de la compañía van en perfiles.config.modulos.
 alter table public.usuarios add column if not exists modulos jsonb;
+-- Otras compañías a las que el usuario puede cambiarse (ids de perfiles), además de perfil_id.
+alter table public.usuarios add column if not exists companias jsonb not null default '[]'::jsonb;
 
 -- Códigos de acceso de un solo uso (OTP) enviados al correo. Solo se guarda el hash (HMAC con APP_SECRETO).
 -- Pedir un código nuevo borra los anteriores de ese correo.

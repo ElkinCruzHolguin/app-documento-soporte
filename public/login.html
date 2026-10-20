@@ -14,6 +14,8 @@
   .login button { width: 100%; margin-top: 16px; padding: 9px; }
   .login .alterno { margin-top: 16px; text-align: center; font-size: 13px; }
   #codigo { font-size: 22px; letter-spacing: 8px; text-align: center; }
+  .recordar { display: flex; align-items: center; gap: 8px; font-weight: 400; font-size: 13px; margin: 4px 0 12px; cursor: pointer; }
+  .recordar input { width: auto; margin: 0; }
 </style>
 </head>
 <body>
@@ -33,12 +35,15 @@
     <!-- Paso 2: código de un solo uso enviado al correo -->
     <form id="formCodigo" hidden>
       <div><label for="codigo">Código de 6 dígitos</label><input id="codigo" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required></div>
+      <label class="recordar"><input type="checkbox" id="recordar" checked> No pedir el código en este navegador durante 7 días</label>
       <button type="submit" id="btnCodigo">Ingresar</button>
       <p class="alterno"><a href="#" id="btnReenviar">Reenviar código</a> · <a href="#" id="btnVolver">Volver</a></p>
     </form>
   </section>
 </main>
 <script>
+// Al llegar a esta pantalla se olvida el menú guardado de la sesión anterior (ver comun.js).
+try { sessionStorage.removeItem('ds_menu'); } catch { /* sin almacenamiento */ }
 const $ = (id) => document.getElementById(id);
 const form = $('form');
 const formCodigo = $('formCodigo');
@@ -81,7 +86,7 @@ formCodigo.onsubmit = (ev) => {
   ev.preventDefault();
   ocupado($('btnCodigo'), async () => {
     try {
-      await post('/api/login/verificar', { codigo: formCodigo.codigo.value });
+      await post('/api/login/verificar', { codigo: formCodigo.codigo.value, recordar: $('recordar').checked });
       location.href = 'index.html';
     } catch (e) {
       formCodigo.codigo.value = '';

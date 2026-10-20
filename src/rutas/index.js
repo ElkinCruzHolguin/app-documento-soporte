@@ -39,6 +39,7 @@ function crearRutasApi({ servicios, entorno }) {
   r.use(requiereSesion(servicios.autenticacion, opciones));
   r.get('/estado', a(sesion.estado));
   r.post('/cuenta/clave', a(cuenta.cambiarClave));
+  r.post('/sesion/compania', a(sesion.cambiarCompania));
 
   r.get('/modulos', sesion.modulos);
 
