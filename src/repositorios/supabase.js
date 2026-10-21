@@ -90,14 +90,26 @@ function crearAlmacenSupabase({ url, llaveServicio, secreto, cliente }) {
       }
       return resumirPrevios([...filas.values()], new Set(numerosExcel));
     },
-    listar: async ({ buscar = '', limite = 100, perfilId = null } = {}) => {
-      let q = db.from('envios')
-        .select('id, creado_en, perfil_nombre, modo, estado, numero, numero_excel, proveedor, identificacion, valor, saphety_id, cuds, mensaje')
-        .order('id', { ascending: false }).limit(limite);
-      if (perfilId != null) q = q.eq('perfil_id', Number(perfilId));
-      const b = buscar.replace(/[^\p{L}\p{N} .-]/gu, '').trim();
-      if (b) q = q.or(`numero.ilike.*${b}*,numero_excel.ilike.*${b}*,proveedor.ilike.*${b}*,identificacion.ilike.*${b}*`);
-      return revisar(await q).map(aEnvio).map(resumenEnvio);
+    listar: async ({ buscar = '', limite = 100, perfilId = null, estado = null } = {}) => {
+      const consulta = (desde, hasta) => {
+        let q = db.from('envios')
+          .select('id, creado_en, perfil_nombre, modo, estado, numero, numero_excel, proveedor, identificacion, valor, saphety_id, cuds, mensaje')
+          .order('id', { ascending: false }).range(desde, hasta);
+        if (perfilId != null) q = q.eq('perfil_id', Number(perfilId));
+        if (estado) q = q.eq('estado', estado);
+        const b = buscar.replace(/[^\p{L}\p{N} .-]/gu, '').trim();
+        if (b) q = q.or(`numero.ilike.*${b}*,numero_excel.ilike.*${b}*,proveedor.ilike.*${b}*,identificacion.ilike.*${b}*`);
+        return q;
+      };
+      // Supabase entrega como máximo 1000 filas por consulta: se pide por páginas hasta completar el límite.
+      const filas = [];
+      while (filas.length < limite) {
+        const pedido = Math.min(1000, limite - filas.length);
+        const pagina = revisar(await consulta(filas.length, filas.length + pedido - 1));
+        filas.push(...pagina);
+        if (pagina.length < pedido) break;
+      }
+      return filas.map(aEnvio).map(resumenEnvio);
     },
     obtener: async (id) => aEnvio(revisar(await db.from('envios').select('*').eq('id', Number(id)).maybeSingle())),
   };

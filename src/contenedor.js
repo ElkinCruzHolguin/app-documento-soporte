@@ -35,7 +35,7 @@ function crearContenedor(entorno) {
     companias,
     usuarios: crearServicioUsuarios({ entorno, usuarios, perfiles, seguridad }),
     documentos: crearServicioDocumentos({ companias, perfiles, envios, saphety, excel }),
-    historial: crearServicioHistorial({ envios, companias }),
+    historial: crearServicioHistorial({ envios, companias, excel }),
     emitidos: crearServicioEmitidos({ companias, perfiles, saphety }),
     recibidos: crearServicioRecibidos({ companias, perfiles, saphety }),
     dashboard: crearServicioDashboard({ companias, perfiles, envios, saphety }),

@@ -97,10 +97,11 @@ function crearAlmacenArchivo(dir) {
       const buscados = new Set(numerosExcel);
       return resumirPrevios(leerEnvios().filter((e) => e.modo === 'real' && e.perfilId === Number(perfilId)), buscados);
     },
-    listar: async ({ buscar = '', limite = 100, perfilId = null } = {}) => {
+    listar: async ({ buscar = '', limite = 100, perfilId = null, estado = null } = {}) => {
       const q = buscar.toUpperCase();
       return leerEnvios()
         .filter((e) => perfilId == null || e.perfilId === Number(perfilId))
+        .filter((e) => !estado || e.estado === estado)
         .filter((e) => !q || [e.numero, e.numeroExcel, e.proveedor, e.identificacion].some((v) => String(v || '').toUpperCase().includes(q)))
         .sort((a, b) => b.id - a.id)
         .slice(0, limite)

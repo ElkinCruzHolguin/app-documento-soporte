@@ -20,6 +20,7 @@
     <div class="fila-botones">
       <input id="buscar" placeholder="Buscar por número, proveedor o identificación" style="max-width:420px">
       <button id="btnBuscar">Buscar</button>
+      <button id="btnExcel" class="secundario" title="Descarga los documentos aceptados de la compañía, con la búsqueda escrita">Exportar aceptados a Excel</button>
     </div>
     <div id="msg"></div>
     <div class="tabla-scroll">
@@ -78,7 +79,34 @@ async function ver(id) {
   document.getElementById('dlgDoc').showModal();
 }
 
+// Descarga el Excel de aceptados respetando la búsqueda. Se pide con fetch para mostrar el error si falla.
+async function exportarExcel() {
+  const msg = document.getElementById('msg');
+  const boton = document.getElementById('btnExcel');
+  boton.disabled = true;
+  try {
+    const resp = await fetch(`/api/envios/aceptados.xlsx?buscar=${encodeURIComponent(document.getElementById('buscar').value.trim())}`);
+    if (resp.status === 401) { location.href = 'login.html'; return; }
+    if (!resp.ok) {
+      const datos = await resp.json().catch(() => ({}));
+      throw new Error(datos.error || `HTTP ${resp.status}`);
+    }
+    const disposicion = resp.headers.get('content-disposition') || '';
+    const nombre = decodeURIComponent((disposicion.match(/filename\*=UTF-8''([^;]+)/) || [])[1] || 'aceptados.xlsx');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await resp.blob());
+    a.download = nombre;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (e) {
+    msg.innerHTML = `<div class="aviso err">No se pudo exportar: ${esc(e.message)}</div>`;
+  } finally {
+    boton.disabled = false;
+  }
+}
+
 document.getElementById('btnBuscar').onclick = cargar;
+document.getElementById('btnExcel').onclick = exportarExcel;
 document.getElementById('buscar').onkeydown = (ev) => { if (ev.key === 'Enter') cargar(); };
 cargar();
 </script>
