@@ -32,6 +32,7 @@ const DEFAULTS = {
   medioPagoForma: '1', // PaymentMeans.Mean (1 contado, 2 crédito)
   unidadMedida: 'NAR',
   incluirIvaCero: true, // informa IVA 01 al 0 % en la línea y en el total
+  incluirReteFuenteCero: false, // informa ReteRenta 06 al 0 % en las líneas sin retención del Excel
   incluirTelefono: true,
 
   // Tipo de documento DIAN (columna TIPO DE DOCUMENTO) -> DocumentType de Saphety

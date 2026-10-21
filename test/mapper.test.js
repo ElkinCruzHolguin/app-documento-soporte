@@ -122,3 +122,21 @@ test('filas del mismo folio con proveedor distinto', () => {
   const { errores } = construirDocumento([filaResidente, { ...filaResidente, identificacion: 901549995 }], CFG);
   assert.ok(errores.some((e) => e.includes('Línea 2: CEDULA O NIT')));
 });
+
+test('ReteFuente al 0 % cuando el Excel no la trae y la compañía lo pide', () => {
+  const sinOpcion = construirDocumento(filaResidente, CFG).json;
+  assert.strictEqual(sinOpcion.WithholdingTaxSubTotals, undefined);
+
+  const { json, errores } = construirDocumento(filaResidente, { ...CFG, incluirReteFuenteCero: true });
+  assert.deepStrictEqual(errores, []);
+  const cero = { WithholdingTaxCategory: '06', TaxPercentage: '0.00', TaxableAmount: '80000.00', TaxAmount: '0.00' };
+  assert.deepStrictEqual(json.Lines[0].WithholdingTaxSubTotals, [cero]);
+  assert.deepStrictEqual(json.Lines[0].WithholdingTaxTotals, [{ WithholdingTaxCategory: '06', TaxAmount: '0.00' }]);
+  assert.deepStrictEqual(json.WithholdingTaxSubTotals, [cero]);
+  assert.deepStrictEqual(json.WithholdingTaxTotals, [{ WithholdingTaxCategory: '06', TaxAmount: '0.00' }]);
+  assert.strictEqual(json.Total.PayableAmount, '80000.00');
+
+  // Si el Excel sí trae ReteFuente, se respeta y no se agrega la de 0 %.
+  const conRete = construirDocumento({ ...filaResidente, baseReteFuente: 80000, tasaReteFuente: 0.04, valorReteFuente: 3200 }, { ...CFG, incluirReteFuenteCero: true }).json;
+  assert.deepStrictEqual(conRete.WithholdingTaxSubTotals.map((r) => r.TaxPercentage), ['4.00']);
+});

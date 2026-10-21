@@ -99,6 +99,7 @@
         <div><label>Forma de pago (PaymentMeans.Mean)</label><input name="medioPagoForma"><div class="ayuda">1 contado, 2 crédito.</div></div>
         <div><label>Unidad de medida</label><input name="unidadMedida"></div>
         <div><label>Informar IVA 0 %</label><select name="incluirIvaCero"><option value="true">Sí</option><option value="false">No</option></select></div>
+        <div><label>Informar ReteFuente 0 %</label><select name="incluirReteFuenteCero"><option value="false">No</option><option value="true">Sí</option></select><div class="ayuda">Si la fila no trae ReteFuente, se envía ReteRenta (06) al 0 % con valor 0.</div></div>
         <div><label>Enviar teléfono del proveedor</label><select name="incluirTelefono"><option value="true">Sí</option><option value="false">No</option></select></div>
       </div>
       <p class="ayuda">Proveedores no residentes: si el Excel no trae ciudad, se usa la capital de su país (México → Ciudad de México, Panamá → Ciudad de Panamá…) y la fila muestra un aviso. Si el código de PAIS no existe, la fila sale con error.</p>

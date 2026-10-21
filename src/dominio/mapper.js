@@ -254,6 +254,10 @@ function construirDocumento(datos, configuracion, opciones = {}) {
     };
     agregarRetencion('05', 'ReteIVA', f.baseReteIva, f.tasaReteIva, f.valorReteIva);
     agregarRetencion('06', 'ReteFuente', f.baseReteFuente, f.tasaReteFuente, f.valorReteFuente);
+    // Sin ReteFuente en el Excel: se informa ReteRenta al 0 % si la compañía lo pide.
+    if (cfg.incluirReteFuenteCero && !propias.some((r) => r.categoria === '06')) {
+      propias.push({ categoria: '06', porcentaje: 0, base: monto, valor: 0 });
+    }
     if (propias.length) {
       linea.WithholdingTaxSubTotals = propias.map((r) => ({
         WithholdingTaxCategory: r.categoria,
