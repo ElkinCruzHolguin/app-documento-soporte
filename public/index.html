@@ -158,7 +158,7 @@ document.getElementById('btnEnviar').onclick = async () => {
   const { perfil } = await api('/api/estado');
   let confirmado = false;
   if (perfil.modoEnvio === 'real') {
-    confirmado = await confirmar(`Se enviarán ${lista.length} documento(s) REALES a Saphety (${perfil.url}) con la compañía «${perfil.nombre}». ¿Continuar?`, { titulo: 'Enviar documentos reales', aceptar: 'Enviar' });
+    confirmado = await confirmar(`Se enviará${lista.length === 1 ? ' 1 documento soporte' : `n ${lista.length} documentos soporte`} a la DIAN a nombre de «${perfil.nombre}». ¿Deseas continuar?`, { titulo: 'Enviar a la DIAN', aceptar: 'Enviar' });
     if (!confirmado) return;
   }
   msg.innerHTML = '';
