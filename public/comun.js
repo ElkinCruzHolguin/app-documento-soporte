@@ -147,3 +147,22 @@ function confirmar(mensaje, { titulo = 'Confirmar', aceptar = 'Aceptar', cancela
     dlg.querySelector('[data-r="si"]').focus();
   });
 }
+
+/** Título + botón «Copiar» + bloque JSON (el botón copia el contenido del bloque). */
+const bloqueCopiable = (titulo, valor) => `<div class="titulo-copiable"><h3>${esc(titulo)}</h3><button type="button" class="secundario copiar">Copiar</button></div><pre>${esc(JSON.stringify(valor, null, 2))}</pre>`;
+
+document.addEventListener('click', async (ev) => {
+  const boton = ev.target.closest('button.copiar');
+  if (!boton) return;
+  const pre = boton.parentElement.nextElementSibling;
+  if (!pre) return;
+  let ok = true;
+  try { await navigator.clipboard.writeText(pre.textContent); } catch {
+    // Sin permiso de portapapeles: se selecciona el texto para copiarlo a mano.
+    const rango = document.createRange(); rango.selectNodeContents(pre);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rango);
+    ok = document.execCommand && document.execCommand('copy');
+  }
+  boton.textContent = ok ? 'Copiado ✓' : 'Selecciona y copia';
+  setTimeout(() => { boton.textContent = 'Copiar'; }, 1500);
+});

@@ -114,9 +114,9 @@ function verDocumento(d) {
     <p>${chip(d.estado)} ${d.modo ? `<span class="ayuda">modo ${esc(d.modo)}</span>` : ''} ${d.saphetyId ? `<span class="ayuda">Id Saphety ${esc(d.saphetyId)}</span>` : ''}</p>
     ${d.mensaje ? `<pre>${esc(d.mensaje)}</pre>` : ''}
     <div class="columnas-2">
-      <div><h3>${d.modo ? 'JSON enviado' : 'JSON que se enviaría'}</h3><pre>${esc(JSON.stringify(d.json, null, 2))}</pre></div>
-      <div><h3>Datos de la fila</h3><pre>${esc(JSON.stringify(d.datos, null, 2))}</pre>
-        ${respuesta ? `<h3>Respuesta de Saphety</h3><pre>${esc(JSON.stringify(respuesta, null, 2))}</pre>` : ''}
+      <div>${bloqueCopiable(d.modo ? 'JSON enviado' : 'JSON que se enviaría', d.json)}</div>
+      <div>${bloqueCopiable('Datos de la fila', d.datos)}
+        ${respuesta ? bloqueCopiable('Respuesta de Saphety', respuesta) : ''}
         <div class="fila-botones">
           <button class="secundario" id="dlgCopiar">Copiar JSON</button>
           ${tieneXml ? '<button class="secundario" id="dlgXml">Descargar XML</button>' : ''}

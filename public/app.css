@@ -148,6 +148,9 @@ dialog .cuerpo { padding: 14px 18px; max-height: 75vh; overflow: auto; }
 dialog.confirmar { width: min(460px, 92vw); }
 dialog.confirmar .cuerpo { line-height: 1.5; overflow-wrap: anywhere; }
 dialog.confirmar .pie { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); }
+.titulo-copiable { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 22px 0 10px; }
+.titulo-copiable h3 { margin: 0; }
+.titulo-copiable button.copiar { min-height: 28px; padding: 4px 10px; font-size: 12px; }
 .columnas-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 800px) { .columnas-2 { grid-template-columns: 1fr; } main { padding: 16px; } }
 .tabla-scroll { overflow-x: auto; max-height: 65vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
