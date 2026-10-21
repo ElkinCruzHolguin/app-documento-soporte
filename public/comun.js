@@ -46,10 +46,9 @@ function pintarMenu() {
   const visible = (m) => !previo || previo.modulos.includes(m.modulo);
   const texto = (m) => (m.admin && previo && !previo.esAdmin ? 'Mi compañía' : m.texto);
   nav.innerHTML = MENU.map((m) => `<a href="${m.href}" data-modulo="${m.modulo}"${m.href === activo ? ' class="activo"' : ''}${m.admin ? ' data-enlace-admin' : ''}${visible(m) ? '' : ' hidden'}>${texto(m)}</a>`).join('');
-  // El cuadro de compañía (banner) va dentro del menú, justo debajo de Dashboard.
+  // El cuadro de compañía (banner) va al inicio del menú, justo debajo del título Zupplio.
   const banner = document.getElementById('banner');
-  const dashboard = nav.querySelector('a[data-modulo="dashboard"]');
-  if (banner && dashboard) dashboard.after(banner);
+  if (banner) nav.prepend(banner);
   // Primera página de la sesión: el menú espera a saber qué módulos tiene el usuario.
   if (!previo) nav.classList.add('cargando');
 }
