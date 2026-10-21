@@ -63,8 +63,8 @@ async function ver(id) {
     <p>${chip(e.estado)} ${e.saphetyId ? `<span class="ayuda">Id Saphety ${esc(e.saphetyId)}</span>` : ''}</p>
     ${e.mensaje ? `<pre>${esc(e.mensaje)}</pre>` : ''}
     <div class="columnas-2">
-      <div><h3>JSON enviado</h3><pre>${esc(JSON.stringify(e.documento, null, 2))}</pre></div>
-      <div><h3>Respuesta de Saphety</h3><pre>${esc(JSON.stringify(respuesta, null, 2))}</pre>
+      <div>${bloqueCopiable('JSON enviado', e.documento)}</div>
+      <div>${bloqueCopiable('Respuesta de Saphety', respuesta)}
         ${xml ? '<div class="fila-botones"><button class="secundario" id="dlgXml">Descargar XML</button></div>' : ''}</div>
     </div>`;
   if (xml) {

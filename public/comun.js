@@ -46,10 +46,9 @@ function pintarMenu() {
   const visible = (m) => !previo || previo.modulos.includes(m.modulo);
   const texto = (m) => (m.admin && previo && !previo.esAdmin ? 'Mi compañía' : m.texto);
   nav.innerHTML = MENU.map((m) => `<a href="${m.href}" data-modulo="${m.modulo}"${m.href === activo ? ' class="activo"' : ''}${m.admin ? ' data-enlace-admin' : ''}${visible(m) ? '' : ' hidden'}>${texto(m)}</a>`).join('');
-  // El cuadro de compañía (banner) va dentro del menú, justo debajo de Dashboard.
+  // El cuadro de compañía (banner) va al inicio del menú, justo debajo del título Zupplio.
   const banner = document.getElementById('banner');
-  const dashboard = nav.querySelector('a[data-modulo="dashboard"]');
-  if (banner && dashboard) dashboard.after(banner);
+  if (banner) nav.prepend(banner);
   // Primera página de la sesión: el menú espera a saber qué módulos tiene el usuario.
   if (!previo) nav.classList.add('cargando');
 }
@@ -104,7 +103,17 @@ async function pintarBanner() {
       ? `<div class="banner-usuario" title="${esc(usuario.usuario)}">${esc(usuario.usuario)}${esAdmin ? ' (admin)' : ''}</div>
          <div class="banner-enlaces">${usuario.cambiaClave ? '<a href="cuenta.html">Cambiar contraseña</a> · ' : ''}<a href="#" id="btnSalir">Salir</a></div>`
       : '';
-    el.innerHTML = `<div class="banner-compania"><span class="banner-etiqueta">Compañía</span>${compania}${modo ? `<div>${modo}</div>` : ''}</div>${quien}`;
+    el.innerHTML = `<div class="banner-compania"><span class="banner-etiqueta">Compañía</span>${compania}${modo ? `<div>${modo}</div>` : ''}</div>`;
+    // Usuario, «Cambiar contraseña» y «Salir» van aparte, al pie del menú lateral.
+    if (quien) {
+      let cuenta = document.getElementById('bannerCuenta');
+      if (!cuenta) {
+        cuenta = document.createElement('div');
+        cuenta.id = 'bannerCuenta';
+        (el.closest('header') || el.parentElement).appendChild(cuenta);
+      }
+      cuenta.innerHTML = quien;
+    }
     const sel = document.getElementById('selCompania');
     if (sel) {
       sel.onchange = async () => {
@@ -125,3 +134,44 @@ async function pintarBanner() {
   }
 }
 document.addEventListener('DOMContentLoaded', pintarBanner);
+
+/**
+ * Ventana de confirmación con el diseño de la app (reemplaza al confirm() del navegador).
+ * @returns {Promise<boolean>} true si el usuario acepta.
+ */
+function confirmar(mensaje, { titulo = 'Confirmar', aceptar = 'Aceptar', cancelar = 'Cancelar', peligro = false } = {}) {
+  return new Promise((resolver) => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'confirmar';
+    dlg.innerHTML = `<div class="cabeza">${esc(titulo)}</div>
+      <div class="cuerpo">${esc(mensaje)}</div>
+      <div class="pie"><button type="button" class="secundario" data-r="no">${esc(cancelar)}</button>
+      <button type="button" class="${peligro ? 'peligro' : ''}" data-r="si">${esc(aceptar)}</button></div>`;
+    let respuesta = false;
+    dlg.querySelector('[data-r="si"]').onclick = () => { respuesta = true; dlg.close(); };
+    dlg.querySelector('[data-r="no"]').onclick = () => dlg.close();
+    dlg.addEventListener('close', () => { dlg.remove(); resolver(respuesta); });
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    dlg.querySelector('[data-r="si"]').focus();
+  });
+}
+
+/** Título + botón «Copiar» + bloque JSON (el botón copia el contenido del bloque). */
+const bloqueCopiable = (titulo, valor) => `<div class="titulo-copiable"><h3>${esc(titulo)}</h3><button type="button" class="secundario copiar">Copiar</button></div><pre>${esc(JSON.stringify(valor, null, 2))}</pre>`;
+
+document.addEventListener('click', async (ev) => {
+  const boton = ev.target.closest('button.copiar');
+  if (!boton) return;
+  const pre = boton.parentElement.nextElementSibling;
+  if (!pre) return;
+  let ok = true;
+  try { await navigator.clipboard.writeText(pre.textContent); } catch {
+    // Sin permiso de portapapeles: se selecciona el texto para copiarlo a mano.
+    const rango = document.createRange(); rango.selectNodeContents(pre);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rango);
+    ok = document.execCommand && document.execCommand('copy');
+  }
+  boton.textContent = ok ? 'Copiado ✓' : 'Selecciona y copia';
+  setTimeout(() => { boton.textContent = 'Copiar'; }, 1500);
+});

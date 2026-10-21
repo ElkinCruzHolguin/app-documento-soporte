@@ -64,6 +64,9 @@ header nav > a.activo::before { background: var(--accent); }
 .banner-etiqueta { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--side-muted); }
 .banner-nombre { color: var(--side-text); font-weight: 600; }
 .banner-usuario { color: var(--side-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+#bannerCuenta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 13px; color: var(--side-muted); flex-basis: 100%; }
+#bannerCuenta a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
+#bannerCuenta a:hover { text-decoration: underline; }
 #banner .selector-compania {
   appearance: none; -webkit-appearance: none; width: auto; min-width: 0; max-width: 100%; margin: 0; cursor: pointer;
   padding: 6px 30px 6px 10px; border-radius: 6px; border: 1px solid var(--side-border); background-color: var(--side);
@@ -76,7 +79,7 @@ header nav > a.activo::before { background: var(--accent); }
 #banner .selector-compania:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #banner .selector-compania:disabled { opacity: .6; cursor: progress; }
 #banner .selector-compania option { color: var(--text); background: var(--panel); }
-/* El cuadro de compañía va dentro del menú, debajo de Dashboard (en móvil, al final del menú). */
+/* El cuadro de compañía va al inicio del menú, debajo del título (en móvil, al final del menú). */
 header nav > #banner { order: 1; flex-basis: 100%; margin-left: 0; }
 @media (min-width: 1024px) {
   header { position: fixed; inset: 0 auto 0 0; width: var(--ancho-lateral); flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0; padding: 0; border-bottom: 0; border-right: 1px solid var(--side-border); overflow-y: auto; }
@@ -87,7 +90,8 @@ header nav > #banner { order: 1; flex-basis: 100%; margin-left: 0; }
   .banner-compania { flex-direction: column; align-items: stretch; gap: 6px; }
   #banner .selector-compania { width: 100%; }
   .banner-enlaces { font-size: 12px; }
-  header nav > #banner { order: 0; flex-basis: auto; margin: 8px 0; }
+  #bannerCuenta { margin: 12px; padding: 12px; border-radius: 6px; background: var(--side-hover); line-height: 1.5; flex-direction: column; align-items: stretch; gap: 4px; flex-basis: auto; }
+  header nav > #banner { order: 0; flex-basis: auto; margin: 0 0 8px; }
   body:has(> header) > main { margin-left: var(--ancho-lateral); }
 }
 
@@ -145,6 +149,12 @@ dialog { border: 1px solid var(--border); border-radius: 10px; background: var(-
 dialog::backdrop { background: oklch(0.12 0.004 260 / 72%); }
 dialog .cabeza { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); font-family: var(--font-display); font-size: 16px; }
 dialog .cuerpo { padding: 14px 18px; max-height: 75vh; overflow: auto; }
+dialog.confirmar { width: min(460px, 92vw); }
+dialog.confirmar .cuerpo { line-height: 1.5; overflow-wrap: anywhere; }
+dialog.confirmar .pie { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); }
+.titulo-copiable { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 22px 0 10px; }
+.titulo-copiable h3 { margin: 0; }
+.titulo-copiable button.copiar { min-height: 28px; padding: 4px 10px; font-size: 12px; }
 .columnas-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 800px) { .columnas-2 { grid-template-columns: 1fr; } main { padding: 16px; } }
 .tabla-scroll { overflow-x: auto; max-height: 65vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }

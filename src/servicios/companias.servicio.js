@@ -7,7 +7,7 @@ const { companiasDe } = require('../dominio/accesos');
 
 const esAdmin = (actor) => actor.rol === 'admin';
 const CAMPOS_NUMERICOS = ['siguienteConsecutivo'];
-const CAMPOS_BOOLEANOS = ['incluirIvaCero', 'incluirTelefono'];
+const CAMPOS_BOOLEANOS = ['incluirIvaCero', 'incluirReteFuenteCero', 'incluirTelefono'];
 const CAMPOS_JSON = [['tiposDocumento', 'tipos de documento']];
 
 /** Normaliza lo que llega del formulario de Administración. */
