@@ -88,10 +88,8 @@ async function pintarBanner() {
     const { perfil, usuario } = await api('/api/estado');
     const esAdmin = usuario.rol === 'admin';
     aplicarModulos(usuario.modulos, esAdmin);
-    // El modo de envío (real/simulado) solo lo ve el administrador: a los usuarios de compañía los confundía.
-    const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>'
-      : !esAdmin ? ''
-      : perfil.modoEnvio === 'real' ? '<span class="chip real">ENVÍO REAL</span>' : '<span class="chip simulado">Modo simulado</span>';
+    // El modo de envío (real/simulado) no se muestra aquí porque confundía; se ve y cambia en Administración.
+    const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>' : '';
     // Administrador o usuario ligado a varias compañías (p. ej. QA y producción): elige con cuál trabajar.
     const otras = usuario.companias || [];
     const sinElegir = !perfil ? '<option value="" selected disabled>Elige una compañía</option>' : '';
