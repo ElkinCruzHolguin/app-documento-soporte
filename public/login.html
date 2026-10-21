@@ -76,7 +76,8 @@ form.onsubmit = (ev) => {
     try {
       const d = await post('/api/login', { usuario: form.usuario.value, clave: form.clave.value });
       if (d.paso === 'codigo') return paso(2, d.destino);
-      location.href = 'index.html';
+      // Se entra por el Dashboard; si el usuario no lo tiene, comun.js lo lleva a su primer módulo visible.
+      location.href = 'dashboard.html';
     } finally {
       form.clave.value = '';
     }
@@ -87,7 +88,7 @@ formCodigo.onsubmit = (ev) => {
   ocupado($('btnCodigo'), async () => {
     try {
       await post('/api/login/verificar', { codigo: formCodigo.codigo.value, recordar: $('recordar').checked });
-      location.href = 'index.html';
+      location.href = 'dashboard.html';
     } catch (e) {
       formCodigo.codigo.value = '';
       formCodigo.codigo.focus();
