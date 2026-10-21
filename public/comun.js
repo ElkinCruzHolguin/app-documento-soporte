@@ -46,6 +46,10 @@ function pintarMenu() {
   const visible = (m) => !previo || previo.modulos.includes(m.modulo);
   const texto = (m) => (m.admin && previo && !previo.esAdmin ? 'Mi compañía' : m.texto);
   nav.innerHTML = MENU.map((m) => `<a href="${m.href}" data-modulo="${m.modulo}"${m.href === activo ? ' class="activo"' : ''}${m.admin ? ' data-enlace-admin' : ''}${visible(m) ? '' : ' hidden'}>${texto(m)}</a>`).join('');
+  // El cuadro de compañía (banner) va dentro del menú, justo debajo de Dashboard.
+  const banner = document.getElementById('banner');
+  const dashboard = nav.querySelector('a[data-modulo="dashboard"]');
+  if (banner && dashboard) dashboard.after(banner);
   // Primera página de la sesión: el menú espera a saber qué módulos tiene el usuario.
   if (!previo) nav.classList.add('cargando');
 }
@@ -88,24 +92,27 @@ async function pintarBanner() {
     const { perfil, usuario } = await api('/api/estado');
     const esAdmin = usuario.rol === 'admin';
     aplicarModulos(usuario.modulos, esAdmin);
-    const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>'
-      : perfil.modoEnvio === 'real' ? '<span class="chip real">ENVÍO REAL</span>' : '<span class="chip simulado">Modo simulado</span>';
-    // Usuario ligado a varias compañías (p. ej. QA y producción): elige con cuál trabajar.
+    // El modo de envío (real/simulado) no se muestra aquí porque confundía; se ve y cambia en Administración.
+    const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>' : '';
+    // Administrador o usuario ligado a varias compañías (p. ej. QA y producción): elige con cuál trabajar.
     const otras = usuario.companias || [];
-    const compania = otras.length > 1
-      ? `<select id="selCompania" class="selector-compania" aria-label="Cambiar de compañía">${otras.map((c) => `<option value="${c.id}" ${perfil && c.id === perfil.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>`
+    const sinElegir = !perfil ? '<option value="" selected disabled>Elige una compañía</option>' : '';
+    const compania = otras.length > 1 || (esAdmin && otras.length && !perfil)
+      ? `<select id="selCompania" class="selector-compania" aria-label="Cambiar de compañía">${sinElegir}${otras.map((c) => `<option value="${c.id}" ${perfil && c.id === perfil.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>`
       : perfil ? `<div class="banner-nombre">${esc(perfil.nombre)}</div>` : '';
     const quien = usuario.login
       ? `<div class="banner-usuario" title="${esc(usuario.usuario)}">${esc(usuario.usuario)}${esAdmin ? ' (admin)' : ''}</div>
          <div class="banner-enlaces">${usuario.cambiaClave ? '<a href="cuenta.html">Cambiar contraseña</a> · ' : ''}<a href="#" id="btnSalir">Salir</a></div>`
       : '';
-    el.innerHTML = `<div class="banner-compania"><span class="banner-etiqueta">Compañía</span>${compania}<div>${modo}</div></div>${quien}`;
+    el.innerHTML = `<div class="banner-compania"><span class="banner-etiqueta">Compañía</span>${compania}${modo ? `<div>${modo}</div>` : ''}</div>${quien}`;
     const sel = document.getElementById('selCompania');
     if (sel) {
       sel.onchange = async () => {
         sel.disabled = true;
         try {
-          await api('/api/sesion/compania', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ perfilId: Number(sel.value) }) });
+          // El administrador cambia la compañía activa (como «Trabajar con esta compañía»); el usuario, la de su sesión.
+          if (esAdmin) await api(`/api/perfiles/${encodeURIComponent(sel.value)}/activar`, { method: 'POST' });
+          else await api('/api/sesion/compania', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ perfilId: Number(sel.value) }) });
           guardarMenu(null); // la otra compañía puede tener otros módulos
           location.reload();
         } catch (e) { sel.disabled = false; alert(e.message); }

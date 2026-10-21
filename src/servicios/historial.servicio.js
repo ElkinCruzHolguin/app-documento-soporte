@@ -1,21 +1,25 @@
 'use strict';
-// Historial de envíos reales. Un usuario de compañía solo ve los de la suya.
+// Historial de envíos reales. Cada quien ve solo los de la compañía con la que trabaja
+// (el usuario, la de su sesión; el administrador, la activa): QA y producción son ambientes distintos.
 const { fallo } = require('../dominio/errores');
 
-function crearServicioHistorial({ envios }) {
-  const companiaFiltro = (actor) => (actor.rol === 'admin' ? null : actor.perfilId);
+function crearServicioHistorial({ envios, companias }) {
+  // Cada envío guarda el nombre que tenía la compañía al enviarse; se muestra el nombre actual.
+  const conNombre = (e, compania) => ({ ...e, perfilNombre: compania.nombre });
 
   return {
-    listar(actor, { buscar = '', limite = 100 } = {}) {
+    async listar(actor, { buscar = '', limite = 100 } = {}) {
+      const compania = await companias.deActor(actor);
+      if (!compania) return [];
       const tope = Math.min(Math.max(Number(limite) || 100, 1), 500);
-      return envios.listar({ buscar: String(buscar), limite: tope, perfilId: companiaFiltro(actor) });
+      const lista = await envios.listar({ buscar: String(buscar), limite: tope, perfilId: compania.id });
+      return lista.map((e) => conNombre(e, compania));
     },
 
     async obtener(actor, id) {
-      const e = await envios.obtener(id);
-      const filtro = companiaFiltro(actor);
-      if (!e || (filtro != null && e.perfilId !== filtro)) throw fallo(404, 'Envío no encontrado.');
-      return e;
+      const [e, compania] = await Promise.all([envios.obtener(id), companias.deActor(actor)]);
+      if (!e || !compania || e.perfilId !== compania.id) throw fallo(404, 'Envío no encontrado.');
+      return conNombre(e, compania);
     },
   };
 }

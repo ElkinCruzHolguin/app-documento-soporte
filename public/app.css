@@ -43,22 +43,22 @@ header h1::before, .login h1::before {
   background: var(--accent) no-repeat center / 20px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23292a2e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
 }
 header nav { display: flex; gap: 4px; flex-wrap: wrap; }
-header nav a { color: var(--side-muted); text-decoration: none; font-weight: 500; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 6px; }
-header nav a::before { content: ""; flex: none; width: 16px; height: 16px; background: currentColor; -webkit-mask: var(--icono) no-repeat center / contain; mask: var(--icono) no-repeat center / contain; }
-header nav a[href="dashboard.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='9' x='3' y='3' rx='1'/%3E%3Crect width='7' height='5' x='14' y='3' rx='1'/%3E%3Crect width='7' height='9' x='14' y='12' rx='1'/%3E%3Crect width='7' height='5' x='3' y='16' rx='1'/%3E%3C/svg%3E"); }
-header nav a[href="index.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='17 8 12 3 7 8'/%3E%3Cline x1='12' x2='12' y1='3' y2='15'/%3E%3C/svg%3E"); }
-header nav a[href="emitidos.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4'/%3E%3Cpath d='m9 15 2 2 4-4'/%3E%3C/svg%3E"); }
-header nav a[href="recibidos.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 12 16 12 14 15 10 15 8 12 2 12'/%3E%3Cpath d='M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/%3E%3C/svg%3E"); }
-header nav a[href="historial.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3Cpath d='M12 7v5l4 2'/%3E%3C/svg%3E"); }
-header nav a[href="admin.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 7h-9'/%3E%3Cpath d='M14 17H5'/%3E%3Ccircle cx='17' cy='17' r='3'/%3E%3Ccircle cx='7' cy='7' r='3'/%3E%3C/svg%3E"); }
-header nav a[hidden] { display: none; }
-header nav a:hover, header nav a.activo { background: var(--side-hover); color: var(--side-text); }
-header nav a.activo::before { background: var(--accent); }
+header nav > a { color: var(--side-muted); text-decoration: none; font-weight: 500; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 6px; }
+header nav > a::before { content: ""; flex: none; width: 16px; height: 16px; background: currentColor; -webkit-mask: var(--icono) no-repeat center / contain; mask: var(--icono) no-repeat center / contain; }
+header nav > a[href="dashboard.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='9' x='3' y='3' rx='1'/%3E%3Crect width='7' height='5' x='14' y='3' rx='1'/%3E%3Crect width='7' height='9' x='14' y='12' rx='1'/%3E%3Crect width='7' height='5' x='3' y='16' rx='1'/%3E%3C/svg%3E"); }
+header nav > a[href="index.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='17 8 12 3 7 8'/%3E%3Cline x1='12' x2='12' y1='3' y2='15'/%3E%3C/svg%3E"); }
+header nav > a[href="emitidos.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4'/%3E%3Cpath d='m9 15 2 2 4-4'/%3E%3C/svg%3E"); }
+header nav > a[href="recibidos.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 12 16 12 14 15 10 15 8 12 2 12'/%3E%3Cpath d='M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/%3E%3C/svg%3E"); }
+header nav > a[href="historial.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3Cpath d='M12 7v5l4 2'/%3E%3C/svg%3E"); }
+header nav > a[href="admin.html"] { --icono: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 7h-9'/%3E%3Cpath d='M14 17H5'/%3E%3Ccircle cx='17' cy='17' r='3'/%3E%3Ccircle cx='7' cy='7' r='3'/%3E%3C/svg%3E"); }
+header nav > a[hidden] { display: none; }
+header nav > a:hover, header nav > a.activo { background: var(--side-hover); color: var(--side-text); }
+header nav > a.activo::before { background: var(--accent); }
 #banner { margin-left: auto; font-size: 13px; color: var(--side-muted); }
 #banner b { color: var(--side-text); }
 #banner a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
 #banner a:hover { text-decoration: underline; }
-#menu.cargando a { visibility: hidden; }
+#menu.cargando > a { visibility: hidden; }
 #banner { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
 .banner-compania { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .banner-etiqueta { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--side-muted); }
@@ -76,15 +76,18 @@ header nav a.activo::before { background: var(--accent); }
 #banner .selector-compania:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #banner .selector-compania:disabled { opacity: .6; cursor: progress; }
 #banner .selector-compania option { color: var(--text); background: var(--panel); }
+/* El cuadro de compañía va dentro del menú, debajo de Dashboard (en móvil, al final del menú). */
+header nav > #banner { order: 1; flex-basis: 100%; margin-left: 0; }
 @media (min-width: 1024px) {
   header { position: fixed; inset: 0 auto 0 0; width: var(--ancho-lateral); flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0; padding: 0; border-bottom: 0; border-right: 1px solid var(--side-border); overflow-y: auto; }
   header h1 { height: 64px; padding: 0 16px; border-bottom: 1px solid var(--side-border); }
   header nav { flex-direction: column; padding: 12px; flex: 1; }
-  header nav a { height: 40px; padding: 0 12px; }
+  header nav > a { height: 40px; padding: 0 12px; }
   #banner { margin: 12px; padding: 12px; border-radius: 6px; background: var(--side-hover); line-height: 1.5; flex-direction: column; align-items: stretch; gap: 10px; }
   .banner-compania { flex-direction: column; align-items: stretch; gap: 6px; }
   #banner .selector-compania { width: 100%; }
   .banner-enlaces { font-size: 12px; }
+  header nav > #banner { order: 0; flex-basis: auto; margin: 8px 0; }
   body:has(> header) > main { margin-left: var(--ancho-lateral); }
 }
 

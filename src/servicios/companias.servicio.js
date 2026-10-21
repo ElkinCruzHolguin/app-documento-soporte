@@ -56,11 +56,12 @@ function crearServicioCompanias({ perfiles, usuarios, saphety }) {
     },
 
     /**
-     * Compañías entre las que el usuario puede cambiarse ({ id, nombre }), la principal primero.
-     * Vacío para el administrador (él elige en Administración).
+     * Compañías entre las que el actor puede cambiarse ({ id, nombre }): el administrador, todas;
+     * un usuario, las ligadas a él con la principal primero.
      */
     async disponibles(actor) {
-      if (esAdmin(actor) || !actor.id) return [];
+      if (esAdmin(actor)) return (await perfiles.listar()).map((p) => ({ id: p.id, nombre: p.nombre }));
+      if (!actor.id) return [];
       const ids = companiasDe(await usuarios.obtener(actor.id));
       const lista = await Promise.all(ids.map((id) => perfiles.obtener(id)));
       return lista.filter(Boolean).map((p) => ({ id: p.id, nombre: p.nombre }));
