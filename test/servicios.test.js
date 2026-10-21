@@ -31,19 +31,24 @@ test('compañías: el administrador ve todas; una compañía solo la suya y no m
   await assert.rejects(s.requerida({ rol: 'empresa', perfilId: 99 }), /no tiene una compañía asignada/);
 });
 
-test('historial: una compañía no ve envíos de otra', async () => {
-  const envios = new Map([[1, { id: 1, perfilId: 1 }], [2, { id: 2, perfilId: 2 }]]);
+test('historial: cada quien ve solo la compañía con la que trabaja, con su nombre actual', async () => {
+  const envios = new Map([[1, { id: 1, perfilId: 1, perfilNombre: 'Vitro QA' }], [2, { id: 2, perfilId: 2, perfilNombre: 'Atica' }]]);
   let filtro;
+  const perfiles = perfilesFalsos();
   const s = crearServicioHistorial({
-    envios: { listar: async (o) => { filtro = o; return []; }, obtener: async (id) => envios.get(Number(id)) || null },
+    envios: { listar: async (o) => { filtro = o; return [...envios.values()].filter((e) => e.perfilId === o.perfilId); }, obtener: async (id) => envios.get(Number(id)) || null },
+    companias: crearServicioCompanias({ perfiles, saphety: {} }),
   });
   await s.listar(VITRO, { limite: 9999 });
   assert.deepStrictEqual(filtro, { buscar: '', limite: 500, perfilId: 1 });
-  await s.listar(ADMIN);
-  assert.strictEqual(filtro.perfilId, null);
   assert.strictEqual((await s.obtener(VITRO, 1)).id, 1);
   await assert.rejects(s.obtener(VITRO, 2), { status: 404 });
-  assert.strictEqual((await s.obtener(ADMIN, 2)).id, 2);
+  // El administrador ve la compañía activa (Vitro), no todas
+  assert.deepStrictEqual((await s.listar(ADMIN)).map((e) => e.id), [1]);
+  assert.strictEqual(filtro.perfilId, 1);
+  await assert.rejects(s.obtener(ADMIN, 2), { status: 404 });
+  // Se muestra el nombre actual de la compañía, no el que tenía al enviar
+  assert.strictEqual((await s.obtener(ADMIN, 1)).perfilNombre, 'Vitro');
 });
 
 test('documentos: las filas con el mismo PREFIJO + FOLIO forman un solo documento', async () => {

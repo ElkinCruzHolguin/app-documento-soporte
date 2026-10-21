@@ -93,7 +93,10 @@ test('login, roles y aislamiento entre compañías', async () => {
     assert.deepStrictEqual((await llamar('/api/envios', { cookie: cVitro })).datos.map((e) => e.numero), ['V1']);
     assert.strictEqual((await llamar(`/api/envios/${idVitro}`, { cookie: cVitro })).status, 200);
     assert.strictEqual((await llamar(`/api/envios/${idAtica}`, { cookie: cVitro })).status, 404);
-    assert.deepStrictEqual((await llamar('/api/envios', { cookie: admin })).datos.map((e) => e.numero).sort(), ['A1', 'V1']);
+    // El administrador ve el historial de la compañía activa, no el de todas
+    await llamar(`/api/perfiles/${atica.id}/activar`, { cookie: admin, metodo: 'POST' });
+    assert.deepStrictEqual((await llamar('/api/envios', { cookie: admin })).datos.map((e) => e.numero), ['A1']);
+    assert.strictEqual((await llamar(`/api/envios/${idVitro}`, { cookie: admin })).status, 404);
 
     // No se puede borrar un perfil con usuarios
     assert.strictEqual((await llamar(`/api/perfiles/${vitro.id}`, { cookie: admin, metodo: 'DELETE' })).status, 400);
