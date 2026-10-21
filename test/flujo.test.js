@@ -156,6 +156,28 @@ test('flujo completo', async () => {
     assert.strictEqual(hist2[0].numero, 'SEDS984000010');
     assert.strictEqual(hist2[0].numeroExcel, 'DSE7461');
 
+    // Exportar a Excel: solo los aceptados de la compañía, respetando la búsqueda
+    const leerXlsx = async (ruta) => {
+      const r = await fetch(URL_APP + ruta);
+      assert.strictEqual(r.status, 200);
+      assert.match(r.headers.get('content-type'), /spreadsheetml/);
+      assert.match(r.headers.get('content-disposition'), /attachment; filename="aceptados-.+\.xlsx"/);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(Buffer.from(await r.arrayBuffer()));
+      const ws = wb.getWorksheet('Aceptados');
+      const filas = [];
+      ws.eachRow((fila, n) => { if (n > 1) filas.push(fila.values.slice(1)); });
+      return { encabezado: ws.getRow(1).values.slice(1), filas };
+    };
+    const xlsx = await leerXlsx('/api/envios/aceptados.xlsx');
+    assert.deepStrictEqual(xlsx.encabezado.slice(0, 4), ['Fecha de envío', 'Compañía', 'Número', 'Número en el Excel']);
+    assert.deepStrictEqual(xlsx.filas.map((f) => [f[2], f[3], f[7]]), [
+      ['SEDS984000011', 'DSE7470', 'aceptado'], ['SEDS984000010', 'DSE7461', 'aceptado'], ['DSE7460', 'DSE7460', 'aceptado'],
+    ]);
+    assert.ok(xlsx.filas[0][0] instanceof Date);
+    assert.strictEqual(typeof xlsx.filas[0][6], 'number');
+    assert.deepStrictEqual((await leerXlsx('/api/envios/aceptados.xlsx?buscar=DSE7461')).filas.map((f) => f[2]), ['SEDS984000010']);
+
     // Token inválido: se avisa que hay que detener el lote
     await llamar(`/api/perfiles/${perfil.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clave: 'otra' }) });
     const sinToken = await enviar({ datos: { ...docs[0].datos, prefijoFolio: 7471 } }, { confirmado: true });

@@ -51,6 +51,30 @@ test('historial: cada quien ve solo la compañía con la que trabaja, con su nom
   assert.strictEqual((await s.obtener(ADMIN, 1)).perfilNombre, 'Vitro');
 });
 
+test('historial: el Excel de aceptados es solo de la compañía con la que trabaja y respeta la búsqueda', async () => {
+  const envios = [
+    { id: 3, perfilId: 1, estado: 'aceptado', numero: 'DSE3', proveedor: 'UBER', valor: 10, creadoEn: '2026-10-21T05:00:00Z', cuds: 'c3' },
+    { id: 2, perfilId: 1, estado: 'rechazado', numero: 'DSE2', proveedor: 'UBER', valor: 20, creadoEn: '2026-10-20T05:00:00Z' },
+    { id: 1, perfilId: 2, estado: 'aceptado', numero: 'DSE1', proveedor: 'UBER', valor: 30, creadoEn: '2026-10-19T05:00:00Z' },
+  ];
+  let filtro, generado;
+  const s = crearServicioHistorial({
+    envios: { listar: async (o) => { filtro = o; return envios.filter((e) => e.perfilId === o.perfilId && (!o.estado || e.estado === o.estado)); } },
+    companias: crearServicioCompanias({ perfiles: perfilesFalsos(), saphety: {} }),
+    excel: { escribirExcel: async (libro) => { generado = libro; return Buffer.from('xlsx'); } },
+  });
+  const a = await s.exportarAceptados(VITRO, { buscar: 'uber' });
+  assert.deepStrictEqual(filtro, { buscar: 'uber', limite: 10000, perfilId: 1, estado: 'aceptado' });
+  assert.strictEqual(a.total, 1);
+  assert.match(a.nombre, /^aceptados-Vitro-\d{4}-\d{2}-\d{2}\.xlsx$/);
+  assert.deepStrictEqual(a.contenido, Buffer.from('xlsx'));
+  assert.strictEqual(generado.hoja, 'Aceptados');
+  assert.deepStrictEqual(generado.filas.map((f) => [f.numero, f.numeroExcel, f.compania, f.cuds]), [['DSE3', 'DSE3', 'Vitro', 'c3']]);
+  // La fecha se muestra en hora de Bogotá (05:00 UTC = 00:00 en Bogotá)
+  assert.strictEqual(generado.filas[0].fecha.toISOString(), '2026-10-21T00:00:00.000Z');
+  await assert.rejects(s.exportarAceptados({ rol: 'empresa', perfilId: 99 }), { status: 404 });
+});
+
 test('documentos: las filas con el mismo PREFIJO + FOLIO forman un solo documento', async () => {
   const { crearServicioDocumentos } = require('../src/servicios/documentos.servicio');
   const fila = (folio, valor, extra = {}) => ({

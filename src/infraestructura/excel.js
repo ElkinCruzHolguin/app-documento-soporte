@@ -117,4 +117,19 @@ async function leerExcel(buffer) {
   return { hoja: ws.name, columnas, faltantes, filas };
 }
 
-module.exports = { leerExcel, normalizar, COLUMNAS };
+/**
+ * Arma un .xlsx de una sola hoja. columnas: [{ titulo, clave, ancho?, formato? }]; filas: objetos con esas claves.
+ * Devuelve un Buffer.
+ */
+async function escribirExcel({ hoja = 'Hoja1', columnas, filas }) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(hoja);
+  ws.columns = columnas.map((c) => ({ header: c.titulo, key: c.clave, width: c.ancho || 18, style: c.formato ? { numFmt: c.formato } : {} }));
+  ws.getRow(1).font = { bold: true };
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  for (const f of filas) ws.addRow(f);
+  if (filas.length) ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columnas.length } };
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+module.exports = { leerExcel, escribirExcel, normalizar, COLUMNAS };
