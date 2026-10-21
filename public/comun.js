@@ -125,3 +125,25 @@ async function pintarBanner() {
   }
 }
 document.addEventListener('DOMContentLoaded', pintarBanner);
+
+/**
+ * Ventana de confirmación con el diseño de la app (reemplaza al confirm() del navegador).
+ * @returns {Promise<boolean>} true si el usuario acepta.
+ */
+function confirmar(mensaje, { titulo = 'Confirmar', aceptar = 'Aceptar', cancelar = 'Cancelar', peligro = false } = {}) {
+  return new Promise((resolver) => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'confirmar';
+    dlg.innerHTML = `<div class="cabeza">${esc(titulo)}</div>
+      <div class="cuerpo">${esc(mensaje)}</div>
+      <div class="pie"><button type="button" class="secundario" data-r="no">${esc(cancelar)}</button>
+      <button type="button" class="${peligro ? 'peligro' : ''}" data-r="si">${esc(aceptar)}</button></div>`;
+    let respuesta = false;
+    dlg.querySelector('[data-r="si"]').onclick = () => { respuesta = true; dlg.close(); };
+    dlg.querySelector('[data-r="no"]').onclick = () => dlg.close();
+    dlg.addEventListener('close', () => { dlg.remove(); resolver(respuesta); });
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    dlg.querySelector('[data-r="si"]').focus();
+  });
+}

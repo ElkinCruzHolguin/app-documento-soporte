@@ -226,7 +226,7 @@ document.getElementById('btnActivar').onclick = async () => {
 };
 
 document.getElementById('btnEliminar').onclick = async () => {
-  if (!confirm(`¿Eliminar la compañía «${actual.nombre}»?`)) return;
+  if (!(await confirmar(`¿Eliminar la compañía «${actual.nombre}»?`, { titulo: 'Eliminar compañía', aceptar: 'Eliminar', peligro: true }))) return;
   try {
     await api(`/api/perfiles/${actual.id}`, { method: 'DELETE' });
     msg('Compañía eliminada.');
@@ -324,12 +324,12 @@ async function cargarUsuarios() {
       const btnModulos = tr.querySelector('.btnModulos');
       if (btnModulos) btnModulos.onclick = () => { editor.hidden = !editor.hidden; };
       const selRol = tr.querySelector('.selRolU');
-      selRol.onchange = () => {
+      selRol.onchange = async () => {
         const aAdmin = selRol.value === 'admin';
         const pregunta = aAdmin
           ? `¿Hacer administrador a «${u.usuario}»? Podrá ver y modificar todas las compañías y gestionar usuarios.`
           : `¿Quitarle el rol de administrador a «${u.usuario}»? Quedará como usuario de la compañía «${perfiles[0] ? perfiles[0].nombre : ''}»; después puedes cambiarla.`;
-        if (!confirm(pregunta)) { selRol.value = u.rol; return; }
+        if (!(await confirmar(pregunta, { titulo: 'Cambiar rol' }))) { selRol.value = u.rol; return; }
         accion(
           () => put(aAdmin ? { rol: 'admin' } : { rol: 'empresa', perfilId: perfiles[0] && perfiles[0].id }),
           aAdmin ? `«${esc(u.usuario)}» ahora es administrador.` : `«${esc(u.usuario)}» ya no es administrador. Revisa su compañía y sus módulos.`,
@@ -344,8 +344,8 @@ async function cargarUsuarios() {
         if (usuario) accion(() => put({ usuario }), `«${esc(u.usuario)}» ahora entra con el correo <b>${esc(usuario.trim().toLowerCase())}</b>.`);
       };
       tr.querySelector('.btnActivo').onclick = () => accion(() => put({ activo: !u.activo }), `Usuario «${esc(u.usuario)}» ${u.activo ? 'desactivado' : 'activado'}.`);
-      tr.querySelector('.btnBorrar').onclick = () => {
-        if (confirm(`¿Eliminar el usuario «${u.usuario}»?`)) accion(() => api(`/api/usuarios/${u.id}`, { method: 'DELETE' }), 'Usuario eliminado.');
+      tr.querySelector('.btnBorrar').onclick = async () => {
+        if (await confirmar(`¿Eliminar el usuario «${u.usuario}»?`, { titulo: 'Eliminar usuario', aceptar: 'Eliminar', peligro: true })) accion(() => api(`/api/usuarios/${u.id}`, { method: 'DELETE' }), 'Usuario eliminado.');
       };
       const sel = tr.querySelector('.selPerfilU');
       if (sel) sel.onchange = () => accion(() => put({ perfilId: Number(sel.value) }), `«${esc(u.usuario)}» ahora pertenece a la compañía «${esc(sel.selectedOptions[0].textContent)}».`);
@@ -375,7 +375,7 @@ document.getElementById('btnCrearUsuario').onclick = async () => {
     usuario: document.getElementById('nuUsuario').value, clave: document.getElementById('nuClave').value,
     rol: document.getElementById('nuRol').value, perfilId: Number(document.getElementById('nuPerfil').value),
   };
-  if (cuerpo.rol === 'admin' && !confirm(`¿Crear «${cuerpo.usuario}» como administrador? Podrá ver y modificar todas las compañías y gestionar usuarios.`)) return;
+  if (cuerpo.rol === 'admin' && !(await confirmar(`¿Crear «${cuerpo.usuario}» como administrador? Podrá ver y modificar todas las compañías y gestionar usuarios.`, { titulo: 'Crear administrador' }))) return;
   const deCompania = modulosDe(perfiles.find((p) => p.id === cuerpo.perfilId));
   const marcados = marcadasEn(document.getElementById('nuModulos'));
   // Todos marcados = sin restricción (verá también lo que se le habilite después a la compañía).
