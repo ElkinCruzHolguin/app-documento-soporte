@@ -92,10 +92,11 @@ async function pintarBanner() {
     const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>'
       : !esAdmin ? ''
       : perfil.modoEnvio === 'real' ? '<span class="chip real">ENVÍO REAL</span>' : '<span class="chip simulado">Modo simulado</span>';
-    // Usuario ligado a varias compañías (p. ej. QA y producción): elige con cuál trabajar.
+    // Administrador o usuario ligado a varias compañías (p. ej. QA y producción): elige con cuál trabajar.
     const otras = usuario.companias || [];
-    const compania = otras.length > 1
-      ? `<select id="selCompania" class="selector-compania" aria-label="Cambiar de compañía">${otras.map((c) => `<option value="${c.id}" ${perfil && c.id === perfil.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>`
+    const sinElegir = !perfil ? '<option value="" selected disabled>Elige una compañía</option>' : '';
+    const compania = otras.length > 1 || (esAdmin && otras.length && !perfil)
+      ? `<select id="selCompania" class="selector-compania" aria-label="Cambiar de compañía">${sinElegir}${otras.map((c) => `<option value="${c.id}" ${perfil && c.id === perfil.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>`
       : perfil ? `<div class="banner-nombre">${esc(perfil.nombre)}</div>` : '';
     const quien = usuario.login
       ? `<div class="banner-usuario" title="${esc(usuario.usuario)}">${esc(usuario.usuario)}${esAdmin ? ' (admin)' : ''}</div>
@@ -107,7 +108,9 @@ async function pintarBanner() {
       sel.onchange = async () => {
         sel.disabled = true;
         try {
-          await api('/api/sesion/compania', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ perfilId: Number(sel.value) }) });
+          // El administrador cambia la compañía activa (como «Trabajar con esta compañía»); el usuario, la de su sesión.
+          if (esAdmin) await api(`/api/perfiles/${encodeURIComponent(sel.value)}/activar`, { method: 'POST' });
+          else await api('/api/sesion/compania', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ perfilId: Number(sel.value) }) });
           guardarMenu(null); // la otra compañía puede tener otros módulos
           location.reload();
         } catch (e) { sel.disabled = false; alert(e.message); }
