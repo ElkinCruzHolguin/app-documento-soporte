@@ -88,7 +88,9 @@ async function pintarBanner() {
     const { perfil, usuario } = await api('/api/estado');
     const esAdmin = usuario.rol === 'admin';
     aplicarModulos(usuario.modulos, esAdmin);
+    // El modo de envío (real/simulado) solo lo ve el administrador: a los usuarios de compañía los confundía.
     const modo = !perfil ? '<span class="chip con_errores">Sin compañía</span>'
+      : !esAdmin ? ''
       : perfil.modoEnvio === 'real' ? '<span class="chip real">ENVÍO REAL</span>' : '<span class="chip simulado">Modo simulado</span>';
     // Usuario ligado a varias compañías (p. ej. QA y producción): elige con cuál trabajar.
     const otras = usuario.companias || [];
@@ -99,7 +101,7 @@ async function pintarBanner() {
       ? `<div class="banner-usuario" title="${esc(usuario.usuario)}">${esc(usuario.usuario)}${esAdmin ? ' (admin)' : ''}</div>
          <div class="banner-enlaces">${usuario.cambiaClave ? '<a href="cuenta.html">Cambiar contraseña</a> · ' : ''}<a href="#" id="btnSalir">Salir</a></div>`
       : '';
-    el.innerHTML = `<div class="banner-compania"><span class="banner-etiqueta">Compañía</span>${compania}<div>${modo}</div></div>${quien}`;
+    el.innerHTML = `<div class="banner-compania"><span class="banner-etiqueta">Compañía</span>${compania}${modo ? `<div>${modo}</div>` : ''}</div>${quien}`;
     const sel = document.getElementById('selCompania');
     if (sel) {
       sel.onchange = async () => {
