@@ -103,7 +103,17 @@ async function pintarBanner() {
       ? `<div class="banner-usuario" title="${esc(usuario.usuario)}">${esc(usuario.usuario)}${esAdmin ? ' (admin)' : ''}</div>
          <div class="banner-enlaces">${usuario.cambiaClave ? '<a href="cuenta.html">Cambiar contraseña</a> · ' : ''}<a href="#" id="btnSalir">Salir</a></div>`
       : '';
-    el.innerHTML = `<div class="banner-compania"><span class="banner-etiqueta">Compañía</span>${compania}${modo ? `<div>${modo}</div>` : ''}</div>${quien}`;
+    el.innerHTML = `<div class="banner-compania"><span class="banner-etiqueta">Compañía</span>${compania}${modo ? `<div>${modo}</div>` : ''}</div>`;
+    // Usuario, «Cambiar contraseña» y «Salir» van aparte, al pie del menú lateral.
+    if (quien) {
+      let cuenta = document.getElementById('bannerCuenta');
+      if (!cuenta) {
+        cuenta = document.createElement('div');
+        cuenta.id = 'bannerCuenta';
+        (el.closest('header') || el.parentElement).appendChild(cuenta);
+      }
+      cuenta.innerHTML = quien;
+    }
     const sel = document.getElementById('selCompania');
     if (sel) {
       sel.onchange = async () => {

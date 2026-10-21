@@ -64,6 +64,9 @@ header nav > a.activo::before { background: var(--accent); }
 .banner-etiqueta { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--side-muted); }
 .banner-nombre { color: var(--side-text); font-weight: 600; }
 .banner-usuario { color: var(--side-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+#bannerCuenta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 13px; color: var(--side-muted); flex-basis: 100%; }
+#bannerCuenta a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
+#bannerCuenta a:hover { text-decoration: underline; }
 #banner .selector-compania {
   appearance: none; -webkit-appearance: none; width: auto; min-width: 0; max-width: 100%; margin: 0; cursor: pointer;
   padding: 6px 30px 6px 10px; border-radius: 6px; border: 1px solid var(--side-border); background-color: var(--side);
@@ -87,6 +90,7 @@ header nav > #banner { order: 1; flex-basis: 100%; margin-left: 0; }
   .banner-compania { flex-direction: column; align-items: stretch; gap: 6px; }
   #banner .selector-compania { width: 100%; }
   .banner-enlaces { font-size: 12px; }
+  #bannerCuenta { margin: 12px; padding: 12px; border-radius: 6px; background: var(--side-hover); line-height: 1.5; flex-direction: column; align-items: stretch; gap: 4px; flex-basis: auto; }
   header nav > #banner { order: 0; flex-basis: auto; margin: 0 0 8px; }
   body:has(> header) > main { margin-left: var(--ancho-lateral); }
 }
