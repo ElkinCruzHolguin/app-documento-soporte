@@ -136,7 +136,7 @@ test('ReteFuente al 0 % cuando el Excel no la trae y la compañía lo pide', () 
   assert.deepStrictEqual(json.WithholdingTaxSubTotals, [cero]);
   assert.deepStrictEqual(json.WithholdingTaxTotals, [{ WithholdingTaxCategory: '06', TaxAmount: '0.00' }]);
   assert.strictEqual(json.Total.PayableAmount, '80000.00');
-  assert.ok(!(json.Notes || []).join('').includes('Retenciones'), 'la ReteFuente de 0 % no se escribe en las notas');
+  assert.match(json.Notes[0], /^Retenciones: ReteFuente 0 %: \$ 0 \| Orden de compra: /, 'la ReteFuente de 0 % también se escribe en las notas');
 
   // Si el Excel sí trae ReteFuente, se respeta y no se agrega la de 0 %.
   const conRete = construirDocumento({ ...filaResidente, baseReteFuente: 80000, tasaReteFuente: 0.04, valorReteFuente: 3200 }, { ...CFG, incluirReteFuenteCero: true }).json;
