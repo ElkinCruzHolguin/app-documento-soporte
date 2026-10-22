@@ -34,7 +34,7 @@ test('fila de proveedor residente persona natural', () => {
   assert.strictEqual(json.SupplierParty.Address.CityCode, '25175');
   assert.strictEqual(json.SupplierParty.Telephone, undefined, 'teléfono 0 no se envía');
   assert.strictEqual(json.Total.PayableAmount, '80000.00');
-  assert.match(json.Notes[0], /Fecha del servicio: 2026-07-15/);
+  assert.ok(!(json.Notes || []).join('').includes('Fecha del servicio'), 'la fecha del servicio ya no va en las notas');
 });
 
 test('códigos con ceros a la izquierda y municipio que no corresponde', () => {
@@ -51,6 +51,7 @@ test('retención en la fuente con tasa decimal', () => {
   assert.deepStrictEqual(errores, []);
   assert.deepStrictEqual(json.WithholdingTaxSubTotals[0], { WithholdingTaxCategory: '06', TaxPercentage: '3.50', TaxableAmount: '1350000.00', TaxAmount: '47250.00' });
   assert.strictEqual(json.Total.PayableAmount, '80000.00');
+  assert.match(json.Notes[0], /Retenciones: ReteFuente 3,5 %: \$ 47\.250$/, 'la retención se escribe en las notas');
 });
 
 test('proveedor no residente: ciudad del Excel, capital del país o error', () => {
@@ -135,6 +136,7 @@ test('ReteFuente al 0 % cuando el Excel no la trae y la compañía lo pide', () 
   assert.deepStrictEqual(json.WithholdingTaxSubTotals, [cero]);
   assert.deepStrictEqual(json.WithholdingTaxTotals, [{ WithholdingTaxCategory: '06', TaxAmount: '0.00' }]);
   assert.strictEqual(json.Total.PayableAmount, '80000.00');
+  assert.ok(!(json.Notes || []).join('').includes('Retenciones'), 'la ReteFuente de 0 % no se escribe en las notas');
 
   // Si el Excel sí trae ReteFuente, se respeta y no se agrega la de 0 %.
   const conRete = construirDocumento({ ...filaResidente, baseReteFuente: 80000, tasaReteFuente: 0.04, valorReteFuente: 3200 }, { ...CFG, incluirReteFuenteCero: true }).json;
