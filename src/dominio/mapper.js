@@ -290,14 +290,14 @@ function construirDocumento(datos, configuracion, opciones = {}) {
 
   // --- Notas
   const notas = [];
-  if (texto(d.numOrden)) notas.push(`Orden de compra: ${texto(d.numOrden)}`);
-  if (texto(d.observacion) && texto(d.observacion) !== texto(d.numOrden)) notas.push(`Observación: ${texto(d.observacion)}`);
   // Retenciones con valor, para que se vean en la representación gráfica (ej. "ReteFuente 3,5 %: $ 47.250").
   const nombreRet = { '05': 'ReteIVA', '06': 'ReteFuente' };
   const pesos = (v) => new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(v);
   const textoRet = retAgrupadas.filter((r) => r.valor > 0)
     .map((r) => `${nombreRet[r.categoria]} ${pesos(r.porcentaje)} %: $ ${pesos(r.valor)}`);
   if (textoRet.length) notas.push(`Retenciones: ${textoRet.join(', ')}`);
+  if (texto(d.numOrden)) notas.push(`Orden de compra: ${texto(d.numOrden)}`);
+  if (texto(d.observacion) && texto(d.observacion) !== texto(d.numOrden)) notas.push(`Observación: ${texto(d.observacion)}`);
 
   // --- Documento
   const json = {

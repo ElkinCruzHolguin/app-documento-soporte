@@ -51,7 +51,7 @@ test('retención en la fuente con tasa decimal', () => {
   assert.deepStrictEqual(errores, []);
   assert.deepStrictEqual(json.WithholdingTaxSubTotals[0], { WithholdingTaxCategory: '06', TaxPercentage: '3.50', TaxableAmount: '1350000.00', TaxAmount: '47250.00' });
   assert.strictEqual(json.Total.PayableAmount, '80000.00');
-  assert.match(json.Notes[0], /Retenciones: ReteFuente 3,5 %: \$ 47\.250$/, 'la retención se escribe en las notas');
+  assert.match(json.Notes[0], /^Retenciones: ReteFuente 3,5 %: \$ 47\.250 \| Orden de compra: 4800598490$/, 'la retención se escribe en las notas');
 });
 
 test('proveedor no residente: ciudad del Excel, capital del país o error', () => {
