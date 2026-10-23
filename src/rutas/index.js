@@ -60,6 +60,7 @@ function crearRutasApi({ servicios, entorno }) {
   r.post('/enviar', m('cargar'), a(documentos.enviar));
 
   r.get('/envios', m('historial'), a(historial.listar));
+  r.get('/envios/aceptados.xlsx', m('historial'), a(historial.exportarAceptados));
   r.get('/envios/:id', m('historial'), a(historial.obtener));
 
   r.get('/emitidos', m('emitidos'), a(emitidos.listar));
