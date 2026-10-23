@@ -187,7 +187,6 @@ function construirDocumento(datos, configuracion, opciones = {}) {
   // --- Líneas (una por fila)
   const retenciones = [];
   const ivas = []; // { porcentaje, base, valor }
-  const fechasItem = [];
   const lineas = filas.map((f, i) => {
     const pre = filas.length > 1 ? `Línea ${i + 1}: ` : '';
     const valor = numero(f.valor);
@@ -200,8 +199,6 @@ function construirDocumento(datos, configuracion, opciones = {}) {
     const fechaItem = texto(f.fechaItem);
     // Regla DSFC02b: con "por operación" (1) la fecha del periodo debe ser la de emisión.
     const desde = concepto === '2' && fechaItem ? fechaItem : fechaEmision;
-    // Si FECHA_ITEM es distinta, se conserva en las notas del documento.
-    if (fechaItem && fechaItem !== desde && !fechasItem.includes(fechaItem)) fechasItem.push(fechaItem);
 
     const linea = {
       Number: String(i + 1),
@@ -293,9 +290,14 @@ function construirDocumento(datos, configuracion, opciones = {}) {
 
   // --- Notas
   const notas = [];
+  // Retenciones (incluida la de 0 %), para que se vean en la representación gráfica (ej. "ReteFuente 3,5 %: $ 47.250").
+  const nombreRet = { '05': 'ReteIVA', '06': 'ReteFuente' };
+  const pesos = (v) => new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(v);
+  const textoRet = retAgrupadas
+    .map((r) => `${nombreRet[r.categoria]} ${pesos(r.porcentaje)} %: $ ${pesos(r.valor)}`);
+  if (textoRet.length) notas.push(`Retenciones: ${textoRet.join(', ')}`);
   if (texto(d.numOrden)) notas.push(`Orden de compra: ${texto(d.numOrden)}`);
   if (texto(d.observacion) && texto(d.observacion) !== texto(d.numOrden)) notas.push(`Observación: ${texto(d.observacion)}`);
-  if (fechasItem.length) notas.push(`Fecha del servicio: ${fechasItem.join(', ')}`);
 
   // --- Documento
   const json = {
